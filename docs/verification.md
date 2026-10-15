@@ -70,6 +70,16 @@ download caches were created. This is a development preview, not a v1 release.
   backup/idempotence/symlink handling. Shell syntax and AppStream validation pass.
 - Cargo vendoring succeeds; 191 packages resolve offline with an empty Cargo
   cache from the prepared source snapshot. No builder or SDK was installed here.
-- Full Flatpak build/sandbox acceptance is pending; CI is configured to build
-  and upload a bundle. The local frontend's filtered-environment test is not
-  equivalent to testing a real Flatpak sandbox.
+- Full Flatpak build passed in CI run 38745965650 after explicitly adding the
+  matching Platform runtime to CI prerequisites. The resulting 1.2 MiB x86_64
+  bundle was downloaded into ignored `target/packages/nirava.flatpak`.
+- Bundle metadata was read with libflatpak: app ID, architecture, GNOME 51
+  runtime, Wayland/dri and scoped companion bus permission match the recipe.
+- The bundle was imported into a temporary OSTree repository under target and
+  checked out as a build tree, without registering/installing the application.
+  Its Apps demo rendered successfully in a real `flatpak build --runtime`
+  sandbox using the already installed GNOME 51 runtime. Screenshot inspected.
+  Explicit Wayland variables were passed for the build sandbox; its missing
+  settings portal produced a warning, without preventing rendering.
+- Real installed Flatpak/host-companion acceptance remains pending. Filtered
+  environment tests and this demo do not validate every desktop operation.
