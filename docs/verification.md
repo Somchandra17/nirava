@@ -6,7 +6,7 @@ Checked on the user's Fedora 45 Niri desktop on 2026-10-15.
 
 - Rust CLI and service compile, including native audio support linked through
   libpulse-binding's supported runtime-library fallback.
-- 43 unit tests: config preservation and round trips, backup/restore with
+- 44 unit tests: config preservation and round trips, backup/restore with
   concurrent-edit refusal, symlink refusal, Niri layout validation, simulated
   display watchdog/restart/hotplug recovery, command output bounds, stale audio
   generations, channel balance, package identifier/command policy, exact RPM
@@ -57,3 +57,19 @@ Checked on the user's Fedora 45 Niri desktop on 2026-10-15.
 No desktop config, installed package, service enablement, audio setting, display
 mode, or power state was changed by these checks. Source/build files and Cargo
 download caches were created. This is a development preview, not a v1 release.
+
+## Packaging checks (2026-10-15)
+
+- Confirmed no Nirava binary on PATH, Flatpak installation or enabled user unit.
+- Homebrew formula parses with Ruby and loads through the installed Homebrew
+  formula DSL. Dependencies were inspected, not installed. Actual formula build
+  and installation remain pending. Homebrew developer mode was restored to its
+  original disabled state after the parser command automatically enabled it.
+- Four packaging tests cover default plan-only behavior, literal arguments,
+  manifest permission contracts, metadata IDs and temporary launcher-copy
+  backup/idempotence/symlink handling. Shell syntax and AppStream validation pass.
+- Cargo vendoring succeeds; 191 packages resolve offline with an empty Cargo
+  cache from the prepared source snapshot. No builder or SDK was installed here.
+- Full Flatpak build/sandbox acceptance is pending; CI is configured to build
+  and upload a bundle. The local frontend's filtered-environment test is not
+  equivalent to testing a real Flatpak sandbox.

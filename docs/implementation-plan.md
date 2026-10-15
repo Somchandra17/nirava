@@ -129,7 +129,7 @@ installations are separate milestones.
 | M4 persistence/setup | Include/profile integration, exact diff, validation, multi-file recovery, Restore | Pure Niri KDL writer only |
 | M5 laptop | Hypridle + kanshi integration; manual Hyprland tests with external display | Read-only Hyprland discovery only |
 | Apps preview | Installed apps/packages, scoped inventory, typed reviews, terminal handoff | Automated checks and native page build; human transaction acceptance pending |
-| M6 release | Native CI, packaging, accessibility, documentation, all v1 gates | Packaging definitions and safe checks in progress |
+| M6 release | Native CI, packaging, accessibility, documentation, all v1 gates | Linux Homebrew HEAD formula and restricted Flatpak frontend recipe; real package acceptance pending |
 
 ## Upstream references and comparable projects
 

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.Somchandra17.Nirava</id>
+  <name>Nirava</name>
+  <summary>Manage settings and software on your Wayland desktop</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer id="io.github.somchandra17"><name>Som</name></developer>
+  <description>
+    <p>Nirava is a native settings application for Niri and Hyprland, built with Rust, GTK 4 and libadwaita.</p>
+    <p>Inspect displays, sound, power and installed software. Review package actions before using your existing package manager.</p>
+    <p>This is a development preview. Desktop writes are disabled by default. The Flatpak frontend requires a separately installed native companion for host discovery; app launching and package terminal handoff are available in the native build.</p>
+  </description>
+  <launchable type="desktop-id">io.github.Somchandra17.Nirava.desktop</launchable>
+  <url type="homepage">https://github.com/Somchandra17/nirava</url>
+  <url type="bugtracker">https://github.com/Somchandra17/nirava/issues</url>
+  <provides><binary>nirava</binary></provides>
+  <categories><category>Settings</category><category>System</category></categories>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -17,6 +17,21 @@ and `niravactl` (inspection and reviewed operations).
 Nothing in this repository installs itself, replaces an idle engine, enables a
 service, or modifies the desktop at build time.
 
+## Installation
+
+See [the installation guide](docs/installation.md) for the Linux Homebrew formula,
+Flatpak frontend/bundle builder, prerequisites and uninstall steps. The installer
+prints a plan by default:
+
+```sh
+bash tools/install.sh brew
+bash tools/install.sh flatpak --bundle target/nirava.flatpak
+```
+
+Add `--apply` only when you want to install. Homebrew provides the native app and
+companion; Flatpak uses the companion for host discovery. No service is started.
+These are development packaging paths, not a Flathub/Homebrew core release.
+
 ## Build and inspect
 
 Rust 1.95 or newer is required. The CLI and backend build without GTK headers:
@@ -137,6 +152,7 @@ and other native package managers remain future work.
 ## Project guide
 
 - [Implementation plan](docs/implementation-plan.md): architecture, remaining milestones, release gates.
+- [Installation](docs/installation.md): Homebrew, Flatpak, launcher registration and removal.
 - [Testing](docs/testing.md): safe automated checks and manual acceptance.
 - [D-Bus API](docs/dbus.md): versioned interface and operation semantics.
 - [Verification record](docs/verification.md): checks actually run and unresolved gates.

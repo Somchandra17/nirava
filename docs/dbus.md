@@ -49,3 +49,12 @@ Demo backends return fictional inventory even when --allow-writes is passed.
 There is no package execution D-Bus method. Reviewed terminal handoff is a local
 UI action requiring --enable-package-actions; package-manager consent remains
 interactive. Package changes are not part of the config Restore mechanism.
+
+## Flatpak frontend identity
+
+The native frontend still verifies GetSessionKey against its compositor context.
+The sandboxed frontend cannot see native compositor sockets, so it verifies
+GetSessionId against a nonempty XDG_SESSION_ID in the same filtered user bus.
+Missing/mismatched IDs refuse the companion. The Flatpak ships only the frontend
+and grants access to this specific bus name, not the whole session/system bus.
+No package executor or host-shell bridge is introduced.

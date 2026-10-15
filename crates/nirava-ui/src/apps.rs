@@ -7,7 +7,7 @@ use super::{Action, add, row};
 
 pub fn render(state: &AppsInventory, group: &adw::PreferencesGroup, tx: &Sender<Action>, demo: bool, package_actions: bool) {
     let demo=demo||state.simulation;
-    let package_actions=package_actions&&!demo;
+    let package_actions=package_actions&&!demo&&!nirava_core::in_flatpak();
     super::reset(group, 4);
     group.set_description(Some("Find installed apps and packages. Review package actions before continuing in DNF or Flatpak."));
     let refresh=row("Installed software", &if state.loaded {format!("{} RPM packages · {} Flatpak apps",state.packages.iter().filter(|p|p.source==PackageSource::Rpm).count(),state.packages.iter().filter(|p|p.source!=PackageSource::Rpm).count())}else{"Loading local package inventory…".into()});
@@ -16,7 +16,7 @@ pub fn render(state: &AppsInventory, group: &adw::PreferencesGroup, tx: &Sender<
     if state.immutable {add(group,4,&row("Immutable system", "RPM inventory is available; DNF actions are disabled on an OSTree system."));}
     if !state.rpm_available && state.loaded {add(group,4,&row("RPM unavailable", "This build currently supports RPM/DNF and Flatpak. Other native package managers are not supported yet."));}
     for error in &state.errors {add(group,4,&row("Inventory unavailable",error));}
-    if !package_actions {add(group,4,&row("Package actions are read-only", "You can review and copy commands. Start Nirava with --enable-package-actions to continue in an interactive terminal."));}
+    if !package_actions {add(group,4,&row("Package actions are read-only", if nirava_core::in_flatpak(){"Review and copy commands here. Use the native app for interactive package actions."}else{"You can review and copy commands. Start Nirava with --enable-package-actions to continue in an interactive terminal."}));}
     let filter=adw::ComboRow::new();filter.set_title("Show");
     filter.set_model(Some(&gtk::StringList::new(&["Applications","RPM packages","Flatpak · User","Flatpak · System"])));
     filter.set_selected(VIEW.with(|saved|saved.borrow().0));
@@ -29,7 +29,7 @@ pub fn render(state: &AppsInventory, group: &adw::PreferencesGroup, tx: &Sender<
     let list=gtk::ListBox::new();list.set_selection_mode(gtk::SelectionMode::None);list.add_css_class("boxed-list");
     let list_row=adw::PreferencesRow::new();list_row.set_child(Some(&list));list_row.set_activatable(false);add(group,4,&list_row);
     let state=Rc::new(state.clone());
-    let desktop_apps=Rc::new(if demo {vec![]} else {let mut apps=gio::AppInfo::all().into_iter().filter(|a|a.should_show()).collect::<Vec<_>>();apps.sort_by_key(|a|a.display_name().to_lowercase());apps});
+    let desktop_apps=Rc::new(if demo||nirava_core::in_flatpak() {vec![]} else {let mut apps=gio::AppInfo::all().into_iter().filter(|a|a.should_show()).collect::<Vec<_>>();apps.sort_by_key(|a|a.display_name().to_lowercase());apps});
     let redraw: Rc<dyn Fn()>={let filter=filter.downgrade();let search=search.downgrade();let list=list.downgrade();let count=count.downgrade();let state=state.clone();let apps=desktop_apps;
         Rc::new(move||{
             let (Some(filter),Some(search),Some(list),Some(count))=(filter.upgrade(),search.upgrade(),list.upgrade(),count.upgrade()) else{return;};
@@ -45,6 +45,7 @@ pub fn render(state: &AppsInventory, group: &adw::PreferencesGroup, tx: &Sender<
                     count.set_label(&format!("{matches} fictional apps · launching is disabled in simulation"));
                     if matches==0{list.append(&row("No matches","Try another search."));}return;
                 }
+                if nirava_core::in_flatpak(){list.append(&row("Use the native app to launch applications","The Flatpak frontend can list host packages through its companion. Choose an RPM or Flatpak view above."));count.set_label("Host application launching is unavailable in this sandbox");return;}
                 let matching=apps.iter().filter(|a|format!("{} {}",a.display_name(),a.id().unwrap_or_default()).to_lowercase().contains(&query)).collect::<Vec<_>>();
                 count.set_label(&format!("{} applications{}",matching.len(),if matching.len()>100{" · first 100 shown; narrow your search"}else{""}));
                 for app in matching.into_iter().take(100){

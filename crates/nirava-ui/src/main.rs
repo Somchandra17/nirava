@@ -36,7 +36,7 @@ fn main() {
     let test_width=args.windows(2).find(|w|w[0]=="--test-width").and_then(|w|w[1].parse::<i32>().ok());
     let page=args.windows(2).find(|w|w[0]=="--page").map(|w|w[1].clone()).unwrap_or_else(||"displays".into());
     let app=adw::Application::builder().application_id(APP_ID).build();
-    app.connect_activate(move|app|build_window(app,demo,smoke,&page,capture.clone(),test_width,package_actions&&!demo));
+    app.connect_activate(move|app|build_window(app,demo,smoke,&page,capture.clone(),test_width,package_actions&&!demo&&!in_flatpak()));
     app.run_with_args(&["nirava"]);
 }
 
@@ -331,6 +331,11 @@ fn backend_loop(demo:bool,rx:mpsc::Receiver<Action>,updates:Sender<Update>) {
         let state=runtime.block_on(async {
             if demo{return Snapshot::demo();}
             if let Some(connection)=connection.as_ref(){if let Ok(proxy)=service_proxy(connection).await{if let Ok(json)=proxy.call::<_,_,String>("GetSnapshot",&()).await{if let Ok(state)=serde_json::from_str(&json){return state;}}}}
+            if in_flatpak(){
+                let mut state=Snapshot::default();state.session.compositor="Host companion unavailable".into();
+                state.session.diagnostics.push("Start the native nirava-sessiond in this graphical login, or use --demo. Flatpak cannot inspect the host directly.".into());
+                return state;
+            }
             let mut state=nirava_backends::discovery::discover().await;
             state.sound=audio.snapshot().unwrap_or_else(|e|SoundState{error:e.to_string(),..Default::default()});state
         });
@@ -342,6 +347,7 @@ fn backend_loop(demo:bool,rx:mpsc::Receiver<Action>,updates:Sender<Update>) {
                 let inventory=runtime.block_on(async {
                     if demo{return nirava_core::apps::AppsInventory::demo();}
                     if let Some(connection)=connection.as_ref(){if let Ok(proxy)=service_proxy(connection).await{if let Ok(json)=proxy.call::<_,_,String>("GetApps",&()).await{if let Ok(state)=serde_json::from_str(&json){return state;}}}}
+                    if in_flatpak(){return nirava_core::apps::AppsInventory {loaded:true,errors:vec!["Native host companion is required for installed software inventory".into()],..Default::default()};}
                     nirava_backends::apps::discover().await
                 });
                 let _=updates.send(Update::Apps(inventory));continue;
@@ -377,6 +383,7 @@ fn backend_loop(demo:bool,rx:mpsc::Receiver<Action>,updates:Sender<Update>) {
 async fn service_proxy(connection:&zbus::Connection)->anyhow::Result<zbus::Proxy<'_>> {
     let proxy=zbus::Proxy::new(connection,BUS_NAME,OBJECT_PATH,"io.github.Somchandra17.Nirava.Manager1").await?;
     let key:String=proxy.call("GetSessionKey",&()).await?;
-    if key!=nirava_core::session_key(){anyhow::bail!("Backend belongs to another graphical session; reconnect from this session");}
+    let id:String=proxy.call("GetSessionId",&()).await?;
+    verify_service_session(&session_key(),&std::env::var("XDG_SESSION_ID").unwrap_or_default(),&key,&id,in_flatpak()).map_err(anyhow::Error::msg)?;
     Ok(proxy)
 }

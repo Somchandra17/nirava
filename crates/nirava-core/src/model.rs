@@ -10,6 +10,35 @@ pub fn session_key()->String {
     crate::transaction::digest(context.as_bytes())
 }
 
+pub fn in_flatpak() -> bool {
+    std::env::var_os("FLATPAK_ID").is_some() || std::path::Path::new("/.flatpak-info").is_file()
+}
+
+/// Native peers share compositor environment. Flatpak hides compositor sockets,
+/// so verify a nonempty login-session ID instead of weakening native checks.
+pub fn verify_service_session(local_key:&str,local_id:&str,peer_key:&str,peer_id:&str,sandboxed:bool)->Result<(),String> {
+    if sandboxed {
+        if local_id.is_empty()||peer_id.is_empty()||local_id!=peer_id {
+            return Err("Host companion login differs or XDG_SESSION_ID is missing. Start both in the same graphical login; pass --env=XDG_SESSION_ID when launching Flatpak if needed.".into());
+        }
+    } else if local_key!=peer_key {
+        return Err("Backend belongs to another graphical session; reconnect from this session".into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod session_tests {
+    use super::*;
+    #[test] fn sandbox_session_matching_requires_known_equal_login_ids() {
+        assert!(verify_service_session("hidden","host","native","host",true).is_ok());
+        for (local,peer) in [("",""),("one",""),("one","two")] {
+            assert!(verify_service_session("hidden",local,"native",peer,true).is_err());
+        }
+        assert!(verify_service_session("one","same","two","same",false).is_err());
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Capability {
     pub id: String,

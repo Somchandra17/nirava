@@ -1,0 +1,41 @@
+name: flatpak
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'packaging/flatpak/**'
+      - 'tools/build-flatpak.py'
+      - 'data/**'
+      - 'crates/**'
+      - 'Cargo.*'
+      - '.github/workflows/flatpak.yml'
+permissions:
+  contents: read
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare isolated CI build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak-builder appstream
+          # This is the disposable GitHub runner, never the user's machine.
+          if sysctl kernel.apparmor_restrict_unprivileged_userns >/dev/null 2>&1; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive -y flathub org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
+      - name: Validate metadata and installer contracts
+        run: |
+          appstreamcli validate --no-net data/io.github.Somchandra17.Nirava.metainfo.xml
+          PYTHONDONTWRITEBYTECODE=1 python3 tests/packaging_test.py
+      - name: Build offline Flatpak bundle
+        run: python3 tools/build-flatpak.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nirava-flatpak-x86_64
+          path: target/nirava.flatpak
+          if-no-files-found: error

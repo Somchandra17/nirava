@@ -1,0 +1,31 @@
+{
+  "app-id": "io.github.Somchandra17.Nirava",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "51",
+  "sdk": "org.gnome.Sdk",
+  "sdk-extensions": ["org.freedesktop.Sdk.Extension.rust-stable"],
+  "command": "nirava",
+  "finish-args": [
+    "--socket=wayland",
+    "--device=dri",
+    "--talk-name=io.github.Somchandra17.Nirava.Session"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/rust-stable/bin",
+    "env": {"CARGO_HOME": "/run/build/nirava/cargo-home"}
+  },
+  "modules": [
+    {
+      "name": "nirava",
+      "buildsystem": "simple",
+      "build-commands": [
+        "cargo build --offline --locked --release -p nirava-ui",
+        "install -Dm755 target/release/nirava /app/bin/nirava",
+        "install -Dm644 data/io.github.Somchandra17.Nirava.desktop /app/share/applications/io.github.Somchandra17.Nirava.desktop",
+        "install -Dm644 data/io.github.Somchandra17.Nirava.svg /app/share/icons/hicolor/scalable/apps/io.github.Somchandra17.Nirava.svg",
+        "install -Dm644 data/io.github.Somchandra17.Nirava.metainfo.xml /app/share/metainfo/io.github.Somchandra17.Nirava.metainfo.xml"
+      ],
+      "sources": [{"type": "dir", "path": "source"}]
+    }
+  ]
+}

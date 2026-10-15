@@ -77,3 +77,18 @@ source through --enable-package-actions. Verify displayed commands, dependency
 review, authentication, cancellation before consent, errors, and refreshed
 inventory. Confirm Flatpak data remains and DNF keeps required protections.
 Never automate a real package transaction or treat terminal spawn as success.
+
+## Packaging
+
+Run `PYTHONDONTWRITEBYTECODE=1 python3 tests/packaging_test.py`,
+`bash -n tools/install.sh` and AppStream validation. Run the install script
+without --apply to review commands. Formula parsing is read-only when using
+an explicitly ephemeral Homebrew developer environment; do not auto-install
+Homebrew, SDKs or packages to validate a recipe.
+
+Use `tools/build-flatpak.py --prepare-only` to stage a source snapshot; validate
+its complete dependency graph with `cargo metadata --offline --locked` and an
+empty temporary CARGO_HOME. Full bundle builds and real sandbox/hardware checks
+require explicit prerequisites and are tracked separately from source checks.
+The GUI test covers native and Flatpak-shaped environments against a private
+demo backend. It does not install or emulate a complete sandbox.

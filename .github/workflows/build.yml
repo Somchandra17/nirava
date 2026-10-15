@@ -17,3 +17,7 @@ jobs:
         run: cargo test --locked --workspace --features nirava-cli/audio,nirava-service/audio
       - name: Test isolated D-Bus
         run: python3 tests/dbus_smoke.py
+      - name: Validate packaging and non-mutating installer behavior
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 python3 tests/packaging_test.py
+          bash -n tools/install.sh

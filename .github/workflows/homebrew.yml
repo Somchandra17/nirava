@@ -1,0 +1,30 @@
+name: homebrew
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Formula/**'
+      - 'crates/**'
+      - 'data/**'
+      - 'Cargo.*'
+      - '.github/workflows/homebrew.yml'
+permissions:
+  contents: read
+jobs:
+  linux-source-install:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test the Linux HEAD formula on a disposable runner
+        env:
+          HOMEBREW_NO_ENV_HINTS: '1'
+        run: |
+          # GitHub's Ubuntu image includes Homebrew outside PATH.
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew update
+          brew tap --custom-remote somchandra17/nirava https://github.com/Somchandra17/nirava.git
+          brew install --HEAD somchandra17/nirava/nirava
+          brew test somchandra17/nirava/nirava
+          niravactl apps --demo --json
