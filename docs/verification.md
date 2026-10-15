@@ -19,10 +19,10 @@ Checked on the user's Fedora 45 Niri desktop on 2026-10-15.
   Python GI. The window was not presented by this template check.
 - Native window links through the local runtime-library fallback, runs all four
   demo pages, and renders wide/narrow scenes without GTK warnings. Screenshots
-  of Plain's own rendered scene were inspected; other apps were not captured.
+  of Nirava's own rendered scene were inspected; other apps were not captured.
 - Real GTK frontend and demo backend coexist on the isolated bus and exchange
   read-only snapshots. Their application/backend bus names are distinct.
-- Read-only `plainctl doctor` matches Niri DP-5 at 3440x1440 / 159.96 Hz /
+- Read-only `niravactl doctor` matches Niri DP-5 at 3440x1440 / 159.96 Hz /
   scale 1, detects Noctalia, reads logind suspend=yes / hibernate=na, and finds
   four native audio devices on PipeWire.
 - Desktop-entry validator passes.
@@ -34,7 +34,7 @@ Checked on the user's Fedora 45 Niri desktop on 2026-10-15.
   and screen-reader acceptance remain pending.
 - rustfmt and clippy are absent. Formatting/lint checks have not run.
 - The user-unit definition is present, but not installed or enabled. Static
-  systemd verification reports the expected missing `/usr/bin/plain-sessiond`
+  systemd verification reports the expected missing `/usr/bin/nirava-sessiond`
   executable because no system deployment took place.
 - Real audio mutations, caffeine effectiveness, Noctalia reload/Restore,
   secure lock-before-suspend, and live display changes have not been tested.

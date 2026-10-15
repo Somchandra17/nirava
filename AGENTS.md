@@ -1,4 +1,4 @@
-# Plain engineering rules
+# Nirava engineering rules
 
 Read docs/implementation-plan.md and README.md before changing behavior.
 This app edits a desktop session: recovery and accurate state are release gates.

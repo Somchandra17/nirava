@@ -1,6 +1,6 @@
 use anyhow::{Result,bail};
 use async_trait::async_trait;
-use plain_core::{OutputState,session_key};
+use nirava_core::{OutputState,session_key};
 use serde::{Serialize,Deserialize};
 use std::{path::PathBuf,sync::Arc,time::Duration};
 use tokio::sync::Mutex;
@@ -127,7 +127,7 @@ mod tests {
         async fn read(&self)->Result<Vec<OutputState>>{Ok(self.state.lock().await.clone())}
         async fn apply(&self,layout:&[OutputState])->Result<()>{*self.state.lock().await=layout.to_vec();Ok(())}
     }
-    fn setup(dir:&std::path::Path)->(Arc<DisplayGuard<Fake>>,Fake,Vec<OutputState>){let baseline=plain_core::Snapshot::demo().displays.outputs;let fake=Fake{state:Arc::new(Mutex::new(baseline.clone()))};(DisplayGuard::new(fake.clone(),dir.join("pending.json")),fake,baseline)}
+    fn setup(dir:&std::path::Path)->(Arc<DisplayGuard<Fake>>,Fake,Vec<OutputState>){let baseline=nirava_core::Snapshot::demo().displays.outputs;let fake=Fake{state:Arc::new(Mutex::new(baseline.clone()))};(DisplayGuard::new(fake.clone(),dir.join("pending.json")),fake,baseline)}
     #[tokio::test(start_paused=true)]async fn watchdog_reverts_without_gui()->Result<()> {
         let dir=tempfile::tempdir()?;let(guard,fake,baseline)=setup(dir.path());let mut draft=baseline.clone();draft[0].scale=1.5;
         guard.preview(draft,Duration::from_secs(15)).await?;tokio::task::yield_now().await;

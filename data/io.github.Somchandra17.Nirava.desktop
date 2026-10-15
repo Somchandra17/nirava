@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Plain
+Name=Nirava
 Comment=Settings for your Wayland desktop
-Exec=plain
-Icon=io.github.Somchandra17.Plain
+Exec=nirava
+Icon=io.github.Somchandra17.Nirava
 Terminal=false
 Categories=Settings;
 Keywords=display;sound;power;Wayland;Niri;Hyprland;

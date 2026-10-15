@@ -1,5 +1,5 @@
 use crate::{command, state_home};
-use plain_core::{PowerState,SessionState};
+use nirava_core::{PowerState,SessionState};
 use anyhow::Result;
 
 #[zbus::proxy(interface="org.freedesktop.login1.Manager",default_service="org.freedesktop.login1",default_path="/org/freedesktop/login1")]
@@ -16,7 +16,7 @@ pub async fn read(session:&SessionState)->PowerState {
     let mut state=PowerState::default();
     if session.idle_owners.len()==1 {state.owner=session.idle_owners[0].clone();}
     if state.owner=="noctalia" {
-        match std::fs::read_to_string(noctalia_config()).and_then(|text|plain_core::config::read_noctalia(&text).map_err(std::io::Error::other)) {
+        match std::fs::read_to_string(noctalia_config()).and_then(|text|nirava_core::config::read_noctalia(&text).map_err(std::io::Error::other)) {
             Ok(settings)=>state.settings=settings,Err(e)=>state.error=e.to_string(),
         }
         if let Ok(status)=command("noctalia",&["msg","status"]).await {
@@ -41,5 +41,5 @@ pub async fn read(session:&SessionState)->PowerState {
 
 pub async fn caffeine()->Result<zbus::zvariant::OwnedFd> {
     let connection=zbus::Connection::system().await?;
-    Ok(LoginManagerProxy::new(&connection).await?.inhibit("idle","Plain","Plain caffeine","block").await?)
+    Ok(LoginManagerProxy::new(&connection).await?.inhibit("idle","Nirava","Nirava caffeine","block").await?)
 }

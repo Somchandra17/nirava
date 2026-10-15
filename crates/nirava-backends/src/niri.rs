@@ -1,6 +1,6 @@
 use crate::command;
 use anyhow::{Result, bail};
-use plain_core::{OutputMode, OutputState};
+use nirava_core::{OutputMode, OutputState};
 use serde_json::Value;
 
 pub async fn read_outputs() -> Result<Vec<OutputState>> {
@@ -77,13 +77,13 @@ mod tests {
     }
     #[test]
     fn reject_disabling_every_monitor() {
-        let baseline=plain_core::Snapshot::demo().displays.outputs;
+        let baseline=nirava_core::Snapshot::demo().displays.outputs;
         let mut draft=baseline.clone();draft[0].enabled=false;
         assert!(validate_layout(&baseline,&draft).is_err());
     }
     #[test]
     fn reject_unadvertised_mode() {
-        let baseline=plain_core::Snapshot::demo().displays.outputs;
+        let baseline=nirava_core::Snapshot::demo().displays.outputs;
         let mut draft=baseline.clone();draft[0].mode.width=9999;
         assert!(validate_layout(&baseline,&draft).is_err());
     }

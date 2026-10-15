@@ -1,6 +1,6 @@
 use adw::prelude::*;
 use gtk::glib;
-use plain_core::*;
+use nirava_core::*;
 use std::{cell::RefCell,rc::Rc,sync::mpsc::{self,Sender},time::Duration};
 
 #[derive(Clone)]
@@ -20,12 +20,12 @@ enum Action {
     Refresh,
     Stop,
 }
-enum Update {Snapshot(Snapshot),Message(String),Failure(String,Option<usize>),Preview(serde_json::Value),Layout(plain_backends::display_guard::Lease)}
+enum Update {Snapshot(Snapshot),Message(String),Failure(String,Option<usize>),Preview(serde_json::Value),Layout(nirava_backends::display_guard::Lease)}
 
 fn main() {
     let args=std::env::args().skip(1).collect::<Vec<_>>();
     if args.iter().any(|s|s=="--help") {
-        println!("Plain settings\nUsage: plain [--demo] [--page displays|sound|power|system] [--smoke-test]\nDefault: read-only discovery. Writes require an explicitly writable backend.");return;
+        println!("Nirava settings\nUsage: nirava [--demo] [--page displays|sound|power|system] [--smoke-test]\nDefault: read-only discovery. Writes require an explicitly writable backend.");return;
     }
     let demo=args.iter().any(|s|s=="--demo");
     let smoke=args.iter().any(|s|s=="--smoke-test");
@@ -34,12 +34,12 @@ fn main() {
     let page=args.windows(2).find(|w|w[0]=="--page").map(|w|w[1].clone()).unwrap_or_else(||"displays".into());
     let app=adw::Application::builder().application_id(APP_ID).build();
     app.connect_activate(move|app|build_window(app,demo,smoke,&page,capture.clone(),test_width));
-    app.run_with_args(&["plain"]);
+    app.run_with_args(&["nirava"]);
 }
 
 fn build_window(app:&adw::Application,demo:bool,smoke:bool,initial_page:&str,capture:Option<String>,test_width:Option<i32>) {
     if let Some(window)=app.active_window(){window.present();return;}
-    let builder=gtk::Builder::from_string(include_str!("../../../data/plain-window.ui"));
+    let builder=gtk::Builder::from_string(include_str!("../../../data/nirava-window.ui"));
     let window:adw::ApplicationWindow=builder.object("window").expect("window template");
     window.set_application(Some(app));
     if smoke{if let Some(width)=test_width{window.set_default_size(width.clamp(400,1600),760);window.set_resizable(false);}}
@@ -51,7 +51,7 @@ fn build_window(app:&adw::Application,demo:bool,smoke:bool,initial_page:&str,cap
     let banner:adw::Banner=builder.object("banner").expect("banner");
     let toasts:adw::ToastOverlay=builder.object("toasts").expect("toasts");
     let (tx,rx)=mpsc::channel();let (updates,receive)=mpsc::channel();
-    std::thread::Builder::new().name("plain-backend-client".into()).spawn(move||backend_loop(demo,rx,updates)).expect("backend worker");
+    std::thread::Builder::new().name("nirava-backend-client".into()).spawn(move||backend_loop(demo,rx,updates)).expect("backend worker");
     let snapshot=Rc::new(RefCell::new(if demo{Snapshot::demo()}else{Snapshot::default()}));
     let pending_layout=Rc::new(RefCell::new(None::<String>));
     let groups:Rc<RefCell<Vec<adw::PreferencesGroup>>>=Rc::new(RefCell::new(Vec::new()));
@@ -204,7 +204,7 @@ fn add_display_editor(group:&adw::PreferencesGroup,index:usize,output:&OutputSta
     add(group,0,&editor);
 }
 
-fn show_layout_confirmation(window:&adw::ApplicationWindow,tx:&Sender<Action>,lease:plain_backends::display_guard::Lease,pending:Rc<RefCell<Option<String>>>) {
+fn show_layout_confirmation(window:&adw::ApplicationWindow,tx:&Sender<Action>,lease:nirava_backends::display_guard::Lease,pending:Rc<RefCell<Option<String>>>) {
     *pending.borrow_mut()=Some(lease.id.clone());
     let dialog=adw::AlertDialog::builder().heading("Keep these display changes?")
         .body("The original layout will return automatically at the recovery deadline. Keep applies only to this login; configuration files are not saved.").build();
@@ -241,7 +241,7 @@ fn render_sound(state:&Snapshot,group:&adw::PreferencesGroup,tx:&Sender<Action>)
         add_volume(group,state.sound.generation,&device.description,device.id,device.input,false,device.volume,device.muted,state.read_only,tx);
     }
     for stream in &state.sound.streams {add_volume(group,state.sound.generation,&stream.application,stream.id,false,true,stream.volume,stream.muted,state.read_only,tx);}
-    if state.read_only{add(group,1,&row("Audio controls are read-only","An explicitly writable Plain backend must be connected before controls are enabled"));}
+    if state.read_only{add(group,1,&row("Audio controls are read-only","An explicitly writable Nirava backend must be connected before controls are enabled"));}
 }
 
 fn add_volume(group:&adw::PreferencesGroup,generation:u64,title:&str,id:u32,input:bool,stream:bool,volume:f64,muted:bool,read_only:bool,tx:&Sender<Action>) {
@@ -296,7 +296,7 @@ fn render_system(state:&Snapshot,group:&adw::PreferencesGroup,tx:&Sender<Action>
         let sender=tx.clone();let backup=backup.clone();
         button.connect_clicked(move|button|{
             let dialog=adw::AlertDialog::builder().heading("Restore this configuration?")
-                .body(format!("File: {}\n\nBackup: {}\n\nPlain refuses to restore if either file has changed since this backup was created.",backup.path,backup.backup)).build();
+                .body(format!("File: {}\n\nBackup: {}\n\nNirava refuses to restore if either file has changed since this backup was created.",backup.path,backup.backup)).build();
             dialog.add_response("cancel","Cancel");dialog.add_response("restore","Restore");dialog.set_default_response(Some("cancel"));dialog.set_close_response("cancel");
             let sender=sender.clone();let id=backup.id.clone();dialog.connect_response(None,move|_,response|{if response=="restore"{let _=sender.send(Action::Restore(id.clone()));}});
             if let Some(root)=button.root().and_downcast::<gtk::Window>(){dialog.present(Some(&root));}
@@ -307,21 +307,21 @@ fn render_system(state:&Snapshot,group:&adw::PreferencesGroup,tx:&Sender<Action>
 
 fn show_preview(window:&adw::ApplicationWindow,tx:&Sender<Action>,preview:serde_json::Value) {
     let id=preview["id"].as_str().unwrap_or_default().to_string();
-    let body=format!("File: {}\n\nBefore:\n{}\n\nAfter:\n{}\n\nPlain will back up the original file and reload Noctalia.",preview["path"].as_str().unwrap_or_default(),serde_json::to_string_pretty(&preview["before"]).unwrap_or_default(),serde_json::to_string_pretty(&preview["after"]).unwrap_or_default());
+    let body=format!("File: {}\n\nBefore:\n{}\n\nAfter:\n{}\n\nNirava will back up the original file and reload Noctalia.",preview["path"].as_str().unwrap_or_default(),serde_json::to_string_pretty(&preview["before"]).unwrap_or_default(),serde_json::to_string_pretty(&preview["after"]).unwrap_or_default());
     let dialog=adw::AlertDialog::builder().heading("Apply these idle settings?").body(&body).build();dialog.add_response("cancel","Cancel");dialog.add_response("apply","Apply");dialog.set_close_response("cancel");dialog.set_default_response(Some("cancel"));
     let sender=tx.clone();dialog.connect_response(None,move|_,response|{let _=sender.send(if response=="apply"{Action::Commit(id.clone())}else{Action::Cancel(id.clone())});});dialog.present(Some(window));
 }
 
 fn backend_loop(demo:bool,rx:mpsc::Receiver<Action>,updates:Sender<Update>) {
     let runtime=tokio::runtime::Runtime::new().expect("backend runtime");
-    let audio=plain_backends::audio::AudioClient::new();
+    let audio=nirava_backends::audio::AudioClient::new();
     let mut connection=runtime.block_on(zbus::Connection::session()).ok();
     loop {
         if connection.is_none(){connection=runtime.block_on(zbus::Connection::session()).ok();}
         let state=runtime.block_on(async {
             if demo{return Snapshot::demo();}
             if let Some(connection)=connection.as_ref(){if let Ok(proxy)=service_proxy(connection).await{if let Ok(json)=proxy.call::<_,_,String>("GetSnapshot",&()).await{if let Ok(state)=serde_json::from_str(&json){return state;}}}}
-            let mut state=plain_backends::discovery::discover().await;
+            let mut state=nirava_backends::discovery::discover().await;
             state.sound=audio.snapshot().unwrap_or_else(|e|SoundState{error:e.to_string(),..Default::default()});state
         });
         let _=updates.send(Update::Snapshot(state));
@@ -357,8 +357,8 @@ fn backend_loop(demo:bool,rx:mpsc::Receiver<Action>,updates:Sender<Update>) {
     }
 }
 async fn service_proxy(connection:&zbus::Connection)->anyhow::Result<zbus::Proxy<'_>> {
-    let proxy=zbus::Proxy::new(connection,BUS_NAME,OBJECT_PATH,"io.github.Somchandra17.Plain.Manager1").await?;
+    let proxy=zbus::Proxy::new(connection,BUS_NAME,OBJECT_PATH,"io.github.Somchandra17.Nirava.Manager1").await?;
     let key:String=proxy.call("GetSessionKey",&()).await?;
-    if key!=plain_core::session_key(){anyhow::bail!("Backend belongs to another graphical session; reconnect from this session");}
+    if key!=nirava_core::session_key(){anyhow::bail!("Backend belongs to another graphical session; reconnect from this session");}
     Ok(proxy)
 }

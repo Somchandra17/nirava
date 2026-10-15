@@ -7,10 +7,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install CI build dependencies
-        run: dnf install -y cargo rust gcc pkgconf-pkg-config gtk4-devel libadwaita-devel libpulse-devel python3 dbus-daemon
+        run: dnf install -y cargo rust gcc pkgconf-pkg-config gtk4-devel libadwaita-devel pulseaudio-libs-devel python3 dbus-daemon
       - name: Build all native components
-        run: cargo build --locked --workspace --features plain-cli/audio,plain-service/audio
+        run: cargo build --locked --workspace --features nirava-cli/audio,nirava-service/audio
       - name: Test disposable fixtures
-        run: cargo test --locked --workspace --features plain-cli/audio,plain-service/audio
+        run: cargo test --locked --workspace --features nirava-cli/audio,nirava-service/audio
       - name: Test isolated D-Bus
         run: python3 tests/dbus_smoke.py

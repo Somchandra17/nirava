@@ -24,5 +24,5 @@ done
 # libpulse-sys needs its normal SONAME alias metadata, rather than its docs
 # build. Only remove that crate's artifacts in this private target directory.
 CARGO_TARGET_DIR=target/runtime-build cargo clean -p libpulse-sys
-CARGO_TARGET_DIR=target/runtime-build cargo build --locked -p plain-backends --features audio
-CARGO_TARGET_DIR=target/runtime-build DOCS_RS=1 cargo rustc --locked -p plain-ui --bin plain -- "${link_args[@]}"
+CARGO_TARGET_DIR=target/runtime-build cargo build --locked -p nirava-backends --features audio
+CARGO_TARGET_DIR=target/runtime-build DOCS_RS=1 cargo rustc --locked -p nirava-ui --bin nirava -- "${link_args[@]}"

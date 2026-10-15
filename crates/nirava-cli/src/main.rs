@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::{Parser,Subcommand};
-use plain_core::*;
+use nirava_core::*;
 
 #[derive(Parser)]
-#[command(about="Inspect Plain's session and stage reviewed settings changes")]
+#[command(about="Inspect Nirava's session and stage reviewed settings changes")]
 struct Args {#[command(subcommand)] command:Action}
 
 #[derive(Subcommand)]
@@ -22,9 +22,9 @@ enum Action {
 }
 
 async fn proxy(connection:&zbus::Connection)->Result<zbus::Proxy<'_>> {
-    let proxy=zbus::Proxy::new(connection,BUS_NAME,OBJECT_PATH,"io.github.Somchandra17.Plain.Manager1").await?;
+    let proxy=zbus::Proxy::new(connection,BUS_NAME,OBJECT_PATH,"io.github.Somchandra17.Nirava.Manager1").await?;
     let key:String=proxy.call("GetSessionKey",&()).await?;
-    if key!=plain_core::session_key(){anyhow::bail!("Plain backend belongs to a different graphical session");}
+    if key!=nirava_core::session_key(){anyhow::bail!("Nirava backend belongs to a different graphical session");}
     Ok(proxy)
 }
 async fn service_snapshot()->Result<Snapshot> {
@@ -33,9 +33,9 @@ async fn service_snapshot()->Result<Snapshot> {
     Ok(serde_json::from_str(&result)?)
 }
 async fn local_snapshot()->Snapshot {
-    let mut snapshot=plain_backends::discovery::discover().await;
+    let mut snapshot=nirava_backends::discovery::discover().await;
     #[cfg(feature="audio")]
-    {let audio=plain_backends::audio::AudioClient::new();snapshot.sound=audio.snapshot().unwrap_or_else(|e|SoundState {error:e.to_string(),..Default::default()});}
+    {let audio=nirava_backends::audio::AudioClient::new();snapshot.sound=audio.snapshot().unwrap_or_else(|e|SoundState {error:e.to_string(),..Default::default()});}
     #[cfg(not(feature="audio"))]
     {snapshot.sound.error="Built without native audio support".into();}
     snapshot
@@ -83,7 +83,7 @@ fn print_result(text:&str)->Result<()> {
     if result.status=="failed"{anyhow::bail!("Operation was not applied");}Ok(())
 }
 fn print_snapshot(state:&Snapshot) {
-    println!("Plain {} | {} | {}",env!("CARGO_PKG_VERSION"),state.session.os,state.session.compositor);
+    println!("Nirava {} | {} | {}",env!("CARGO_PKG_VERSION"),state.session.os,state.session.compositor);
     println!("Mode: {}",if state.read_only{"read-only"}else{"explicit writes enabled"});
     println!("Idle owners: {}",state.session.idle_owners.join(", "));
     println!("Displays: {} ({})",state.displays.outputs.len(),state.displays.persistence_owner);

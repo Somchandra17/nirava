@@ -13,17 +13,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def inside():
-    service = ROOT / "target/debug/plain-sessiond"
-    cli = ROOT / "target/debug/plainctl"
+    service = ROOT / "target/debug/nirava-sessiond"
+    cli = ROOT / "target/debug/niravactl"
     if not service.is_file() or not cli.is_file():
         raise SystemExit("Run cargo build --locked before this check")
-    with tempfile.TemporaryDirectory(prefix="plain-ipc-test-") as temp:
+    with tempfile.TemporaryDirectory(prefix="nirava-ipc-test-") as temp:
         env = os.environ.copy()
         for name in ("NIRI_SOCKET", "HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY"):
             env.pop(name, None)
         env.update(HOME=temp, XDG_CONFIG_HOME=temp + "/config",
                    XDG_STATE_HOME=temp + "/state", XDG_RUNTIME_DIR=temp + "/runtime",
-                   XDG_SESSION_ID="plain-test")
+                   XDG_SESSION_ID="nirava-test")
         Path(env["XDG_RUNTIME_DIR"]).mkdir(mode=0o700)
 
         def run(*args):
@@ -39,9 +39,9 @@ def inside():
                     if proc.poll() is not None:
                         raise AssertionError(proc.stderr.read())
                     ready = subprocess.run(["gdbus", "call", "--session", "--dest",
-                                            "io.github.Somchandra17.Plain.Session", "--object-path",
-                                            "/io/github/Somchandra17/Plain", "--method",
-                                            "io.github.Somchandra17.Plain.Manager1.GetSessionKey"],
+                                            "io.github.Somchandra17.Nirava.Session", "--object-path",
+                                            "/io/github/Somchandra17/Nirava", "--method",
+                                            "io.github.Somchandra17.Nirava.Manager1.GetSessionKey"],
                                            env=env, text=True, capture_output=True, timeout=5)
                     if ready.returncode == 0:
                         status = run("status", "--json")
@@ -66,9 +66,9 @@ def inside():
                                      ("SetMute", ["1", "999", "false", "false", "true"]),
                                      ("SetDefaultDevice", ["1", "fake-device", "false"])):
                     result = subprocess.run(["gdbus", "call", "--session", "--dest",
-                                             "io.github.Somchandra17.Plain.Session",
-                                             "--object-path", "/io/github/Somchandra17/Plain",
-                                             "--method", "io.github.Somchandra17.Plain.Manager1." + method,
+                                             "io.github.Somchandra17.Nirava.Session",
+                                             "--object-path", "/io/github/Somchandra17/Nirava",
+                                             "--method", "io.github.Somchandra17.Nirava.Manager1." + method,
                                              *args], env=env, text=True, capture_output=True, timeout=10)
                     assert result.returncode == 0, result.stderr
                     operation = json.loads(ast.literal_eval(result.stdout)[0])

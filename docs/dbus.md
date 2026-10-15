@@ -1,8 +1,8 @@
 # Session D-Bus API
 
-Bus name: `io.github.Somchandra17.Plain.Session` (user bus only).
-Object: `/io/github/Somchandra17/Plain`.
-Interface: `io.github.Somchandra17.Plain.Manager1`.
+Bus name: `io.github.Somchandra17.Nirava.Session` (user bus only).
+Object: `/io/github/Somchandra17/Nirava`.
+Interface: `io.github.Somchandra17.Nirava.Manager1`.
 
 Snapshots are JSON strings with schema_version=1 and typed Rust domain models.
 This early wire format is not a stable public API. Structured D-Bus records

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the real GTK client with the demo backend on a private user bus.
 
-Requires an existing graphical display. Captures only Plain's rendered scene.
+Requires an existing graphical display. Captures only Nirava's rendered scene.
 It does not change settings, connect to the real session backend, or use audio.
 """
 import json
@@ -16,21 +16,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def inside():
-    candidates = [ROOT / "target/debug/plain", ROOT / "target/runtime-build/debug/plain"]
+    candidates = [ROOT / "target/debug/nirava", ROOT / "target/runtime-build/debug/nirava"]
     ui = next((path for path in candidates if path.is_file()), None)
     if ui is None:
         raise SystemExit("Build the native window first")
     env = os.environ.copy()
     env["GSK_RENDERER"] = "cairo"
     env.update(GTK_USE_PORTAL="0", GIO_USE_VFS="local", NO_AT_BRIDGE="1", GSETTINGS_BACKEND="memory")
-    proc = subprocess.Popen([str(ROOT / "target/debug/plain-sessiond"), "--demo"],
+    proc = subprocess.Popen([str(ROOT / "target/debug/nirava-sessiond"), "--demo"],
                             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     try:
         for _ in range(50):
             result = subprocess.run(["gdbus", "call", "--session", "--dest",
-                                    "io.github.Somchandra17.Plain.Session", "--object-path",
-                                    "/io/github/Somchandra17/Plain", "--method",
-                                    "io.github.Somchandra17.Plain.Manager1.GetSessionKey"],
+                                    "io.github.Somchandra17.Nirava.Session", "--object-path",
+                                    "/io/github/Somchandra17/Nirava", "--method",
+                                    "io.github.Somchandra17.Nirava.Manager1.GetSessionKey"],
                                     env=env, capture_output=True, text=True, timeout=15)
             if result.returncode == 0:
                 break
@@ -39,7 +39,7 @@ def inside():
             time.sleep(0.1)
         else:
             raise AssertionError("Demo backend did not start")
-        with tempfile.TemporaryDirectory(prefix="plain-frontend-") as temp:
+        with tempfile.TemporaryDirectory(prefix="nirava-frontend-") as temp:
             capture = Path(temp) / "window.png"
             # No --demo flag: this must read the private-bus demo backend.
             result = subprocess.run([str(ui), "--page", "sound", "--smoke-test",
@@ -48,7 +48,7 @@ def inside():
             assert result.returncode == 0, result.stderr
             assert capture.is_file() and capture.stat().st_size > 1000, result.stderr
             assert proc.poll() is None
-            result = subprocess.run([str(ROOT / "target/debug/plainctl"), "status", "--json"],
+            result = subprocess.run([str(ROOT / "target/debug/niravactl"), "status", "--json"],
                                     env=env, capture_output=True, text=True, timeout=15)
             assert json.loads(result.stdout)["read_only"] is True
     finally:

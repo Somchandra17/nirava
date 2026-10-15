@@ -21,9 +21,9 @@ change a desktop config.
 With native build dependencies available:
 
 ```sh
-cargo build --locked --workspace --features plain-service/audio,plain-cli/audio
-cargo clippy --locked --workspace --all-targets --features plain-service/audio,plain-cli/audio -- -D warnings
-cargo run -p plain-ui -- --demo --smoke-test
+cargo build --locked --workspace --features nirava-service/audio,nirava-cli/audio
+cargo clippy --locked --workspace --all-targets --features nirava-service/audio,nirava-cli/audio -- -D warnings
+cargo run -p nirava-ui -- --demo --smoke-test
 ```
 
 The GUI smoke test briefly presents a fictional-device window and exits.

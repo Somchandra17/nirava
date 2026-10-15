@@ -56,7 +56,7 @@ pub struct CommittedChange {
 impl CommittedChange {
     pub fn check_restore(&self) -> Result<Vec<u8>> {
         if fs::symlink_metadata(&self.path)?.file_type().is_symlink() { bail!("Restore target became a symlink"); }
-        if digest(&fs::read(&self.path)?) != self.written_hash { bail!("Restore refused: the file was edited after Plain wrote it"); }
+        if digest(&fs::read(&self.path)?) != self.written_hash { bail!("Restore refused: the file was edited after Nirava wrote it"); }
         let original = fs::read(&self.backup)?;
         if digest(&original) != self.original_hash { bail!("Backup was modified; restore refused"); }
         Ok(original)

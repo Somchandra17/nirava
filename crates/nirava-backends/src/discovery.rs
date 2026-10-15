@@ -1,5 +1,5 @@
 use crate::{command, niri, power};
-use plain_core::*;
+use nirava_core::*;
 
 pub async fn discover() -> Snapshot {
     let mut snapshot = Snapshot::default();

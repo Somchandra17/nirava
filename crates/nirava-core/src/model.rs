@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-pub const APP_ID: &str = "io.github.Somchandra17.Plain";
-pub const BUS_NAME: &str = "io.github.Somchandra17.Plain.Session";
-pub const OBJECT_PATH: &str = "/io/github/Somchandra17/Plain";
+pub const APP_ID: &str = "io.github.Somchandra17.Nirava";
+pub const BUS_NAME: &str = "io.github.Somchandra17.Nirava.Session";
+pub const OBJECT_PATH: &str = "/io/github/Somchandra17/Nirava";
 pub const SCHEMA_VERSION: u32 = 1;
 
 pub fn session_key()->String {

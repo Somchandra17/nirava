@@ -1,5 +1,5 @@
 [package]
-name = "plain-backends"
+name = "nirava-backends"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,7 @@ default = []
 audio = ["dep:libpulse-binding"]
 
 [dependencies]
-plain-core.workspace = true
+nirava-core.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true

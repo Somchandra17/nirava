@@ -3,7 +3,7 @@
 use anyhow::{Result, anyhow, bail};
 use libpulse_binding as pulse;
 use pulse::{callbacks::ListResult, context::{Context,FlagSet,State}, mainloop::threaded::Mainloop, volume::{ChannelVolumes,Volume}};
-use plain_core::{AudioDevice,AudioStream,SoundState};
+use nirava_core::{AudioDevice,AudioStream,SoundState};
 use std::sync::{Arc,atomic::{AtomicU64,Ordering},mpsc::{self,Sender,Receiver}};
 use std::time::Duration;
 
@@ -22,7 +22,7 @@ impl Default for AudioClient {fn default()->Self{Self::new()}}
 impl AudioClient {
     pub fn new()->Self {
         let (tx,rx)=mpsc::channel();
-        std::thread::Builder::new().name("plain-audio".into()).spawn(move||worker(rx)).expect("audio worker creation");
+        std::thread::Builder::new().name("nirava-audio".into()).spawn(move||worker(rx)).expect("audio worker creation");
         Self{tx}
     }
     pub fn snapshot(&self)->Result<SoundState> {
@@ -96,7 +96,7 @@ fn check_generation(expected:u64,current:u64)->Result<()> {
 
 fn connect(revision:Arc<AtomicU64>)->Result<(Mainloop,Context)> {
     let mut ml=Mainloop::new().ok_or_else(||anyhow!("Cannot create audio loop"))?;
-    let mut ctx=Context::new(&ml,"Plain settings").ok_or_else(||anyhow!("Cannot create audio context"))?;
+    let mut ctx=Context::new(&ml,"Nirava settings").ok_or_else(||anyhow!("Cannot create audio context"))?;
     ctx.connect(None,FlagSet::NOAUTOSPAWN,None).map_err(|e|anyhow!("Audio connect: {e:?}"))?;
     ml.start().map_err(|_|anyhow!("Cannot start audio loop"))?;
     let deadline=std::time::Instant::now()+Duration::from_secs(3);

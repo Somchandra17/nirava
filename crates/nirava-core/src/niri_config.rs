@@ -49,7 +49,7 @@ pub fn extract_outputs(text:&str,outputs:&[OutputState])->Result<(String,String)
     for node in doc.nodes(){if outputs.iter().any(|o|matches(node,o)){let range=span(node);extracted.push_str(&text[range.clone()]);extracted.push('\n');remove.push(range);}}
     remove.sort_by_key(|r|std::cmp::Reverse(r.start));let mut root=text.to_string();for range in remove{root.replace_range(range,"");}
     let managed=patch_outputs(&extracted,outputs)?;
-    root.push_str("\n// Display settings managed by Plain; use Restore Integration to undo.\ninclude \"plain-displays.kdl\"\n");
+    root.push_str("\n// Display settings managed by Nirava; use Restore Integration to undo.\ninclude \"nirava-displays.kdl\"\n");
     parse(&root)?;Ok((root,managed))
 }
 
@@ -79,7 +79,7 @@ mod tests {
         let text="input { keyboard { xkb { layout \"us\"; }; }; }\noutput \"DP-5\" { scale 1; }\n";
         let (root,managed)=extract_outputs(text,&[output()])?;
         assert!(root.starts_with("input { keyboard { xkb { layout \"us\"; }; }; }\n"));
-        assert!(root.contains("include \"plain-displays.kdl\""));assert!(managed.contains("output \"DP-5\""));Ok(())
+        assert!(root.contains("include \"nirava-displays.kdl\""));assert!(managed.contains("output \"DP-5\""));Ok(())
     }
     #[test]
     fn duplicate_definitions_are_refused() {

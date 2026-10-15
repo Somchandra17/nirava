@@ -1,4 +1,4 @@
-# Plain implementation plan
+# Nirava implementation plan
 
 ## Product decisions
 
@@ -22,8 +22,8 @@ kanshi. A timer or successful command exit is not proof of a secure lock.
 
 ```mermaid
 flowchart LR
-  UI[plain / GTK main loop] -->|versioned user D-Bus| S[plain-sessiond / Tokio]
-  CLI[plainctl] --> S
+  UI[nirava / GTK main loop] -->|versioned user D-Bus| S[nirava-sessiond / Tokio]
+  CLI[niravactl] --> S
   S --> D[Niri / Hyprland native IPC]
   S --> A[libpulse worker / PipeWire Pulse server]
   S --> L[logind D-Bus]
@@ -31,11 +31,11 @@ flowchart LR
   S --> T[staging, backups, recovery journals]
 ```
 
-- `plain-core`: serializable domain models, config editors, guarded file transactions.
-- `plain-backends`: discovery, native compositor adapters, audio, logind, preview watchdog.
-- `plain-service`: versioned user-bus interface; all mutations are explicitly gated.
-- `plain-ui`: GtkBuilder/Adwaita shell; asynchronous backend worker, no device work on GTK's thread.
-- `plain-cli`: diagnostics, review, commit, recovery, and acceptance-test commands.
+- `nirava-core`: serializable domain models, config editors, guarded file transactions.
+- `nirava-backends`: discovery, native compositor adapters, audio, logind, preview watchdog.
+- `nirava-service`: versioned user-bus interface; all mutations are explicitly gated.
+- `nirava-ui`: GtkBuilder/Adwaita shell; asynchronous backend worker, no device work on GTK's thread.
+- `nirava-cli`: diagnostics, review, commit, recovery, and acceptance-test commands.
 
 Pinned dependency resolution is in Cargo.lock. GTK 4.12/libadwaita 1.6 are
 minimum native versions; Rust bindings are gtk4 0.11/adw 0.9. Audio uses
@@ -46,7 +46,7 @@ handles user D-Bus and logind. No privileged daemon or arbitrary-shell RPC.
 
 Read → stage → parse/validate → show exact changes → explicit Apply → recheck
 source hash → timestamped backup → atomic replacement → reload → readback.
-Restore refuses a file edited since Plain wrote it and verifies backup hashes.
+Restore refuses a file edited since Nirava wrote it and verifies backup hashes.
 Hash checks reduce races; an external writer is not made cooperative by them.
 Parent symlinks and multi-file crash atomicity need further hardening before
 integration is released.
@@ -113,7 +113,7 @@ decompiling installed software.
 - [nwg-displays](https://github.com/nwg-piotr/nwg-displays)
 - [nwg-shell-config](https://github.com/nwg-piotr/nwg-shell-config)
 
-ReSet is the closest broad Rust/GTK settings reference; Plain keeps its own
+ReSet is the closest broad Rust/GTK settings reference; Nirava keeps its own
 implementation so display transactions and existing-engine integration can
 be designed around these two machines. Review upstream licenses before copying
 code. No external code has been vendored into this project.
