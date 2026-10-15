@@ -62,8 +62,9 @@ download caches were created. This is a development preview, not a v1 release.
 
 - Confirmed no Nirava binary on PATH, Flatpak installation or enabled user unit.
 - Homebrew formula parses with Ruby and loads through the installed Homebrew
-  formula DSL. Dependencies were inspected, not installed. Actual formula build
-  and installation remain pending. Homebrew developer mode was restored to its
+  formula DSL. The full Linux HEAD formula source install and `brew test` passed
+  on disposable GitHub runner 38745528288; dependencies were not installed on
+  the user’s PC. Homebrew developer mode was restored to its
   original disabled state after the parser command automatically enabled it.
 - Four packaging tests cover default plan-only behavior, literal arguments,
   manifest permission contracts, metadata IDs and temporary launcher-copy

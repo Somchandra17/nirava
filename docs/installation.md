@@ -13,8 +13,10 @@ Two distribution paths are provided:
 
 This is a project tap and a bundle recipe, not a Homebrew core or Flathub listing.
 There is no macOS desktop support, stable release tag, signed release repository,
-or prebuilt Homebrew bottle yet. Homebrew source installation has its own disposable CI workflow;
-real local installation and Flatpak sandbox acceptance remain separate steps.
+or prebuilt Homebrew bottle yet. The Homebrew source-install/test and Flatpak bundle workflows have passed on
+disposable CI runners. The downloaded Flatpak also passed a local demo build-
+sandbox check without installation. Real installed host-companion acceptance
+remains a separate step.
 
 ## Homebrew
 
