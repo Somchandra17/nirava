@@ -6,5 +6,5 @@ Exec=nirava
 Icon=io.github.Somchandra17.Nirava
 Terminal=false
 Categories=Settings;
-Keywords=display;sound;power;Wayland;Niri;Hyprland;
+Keywords=display;sound;power;apps;packages;software;Flatpak;RPM;Wayland;Niri;Hyprland;
 StartupNotify=true

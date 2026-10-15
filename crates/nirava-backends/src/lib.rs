@@ -1,3 +1,4 @@
+pub mod apps;
 pub mod discovery;
 pub mod display_guard;
 pub mod niri;

@@ -22,7 +22,7 @@ def inside():
         raise SystemExit("Build the native window first")
     env = os.environ.copy()
     env["GSK_RENDERER"] = "cairo"
-    env.update(GTK_USE_PORTAL="0", GIO_USE_VFS="local", NO_AT_BRIDGE="1", GSETTINGS_BACKEND="memory")
+    env.update(GTK_USE_PORTAL="0", GIO_USE_VFS="local", NO_AT_BRIDGE="1", GTK_A11Y="none", GSETTINGS_BACKEND="memory")
     proc = subprocess.Popen([str(ROOT / "target/debug/nirava-sessiond"), "--demo"],
                             env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     try:
@@ -40,13 +40,15 @@ def inside():
         else:
             raise AssertionError("Demo backend did not start")
         with tempfile.TemporaryDirectory(prefix="nirava-frontend-") as temp:
-            capture = Path(temp) / "window.png"
-            # No --demo flag: this must read the private-bus demo backend.
-            result = subprocess.run([str(ui), "--page", "sound", "--smoke-test",
-                                     "--test-width", "540", "--snapshot", str(capture)],
-                                    env=env, capture_output=True, text=True, timeout=20)
-            assert result.returncode == 0, result.stderr
-            assert capture.is_file() and capture.stat().st_size > 1000, result.stderr
+            for page in ("displays", "sound", "power", "system", "apps"):
+                capture = Path(temp) / (page + ".png")
+                # No --demo: the real client must read the private demo backend.
+                result = subprocess.run([str(ui), "--page", page, "--smoke-test",
+                                         "--test-width", "540", "--snapshot", str(capture)],
+                                        env=env, capture_output=True, text=True, timeout=20)
+                assert result.returncode == 0, result.stderr
+                assert capture.is_file() and capture.stat().st_size > 1000, result.stderr
+                assert "CRITICAL" not in result.stderr, result.stderr
             assert proc.poll() is None
             result = subprocess.run([str(ROOT / "target/debug/niravactl"), "status", "--json"],
                                     env=env, capture_output=True, text=True, timeout=15)

@@ -48,8 +48,15 @@ impl<D:OutputDriver> DisplayGuard<D> {
         self.write_journal(&lease)?;
         *active=Some(lease.clone());
         let guard=Arc::clone(self);let watchdog_id=id.clone();
-        tokio::spawn(async move{tokio::time::sleep_until(deadline).await;
-            if guard.active().await.is_some_and(|lease|lease.id==watchdog_id){if let Err(error)=guard.revert(&watchdog_id).await{tracing::warn!(%error,"Display watchdog recovery");}}
+        tokio::spawn(async move{
+            tokio::time::sleep_until(deadline).await;
+            while guard.active().await.is_some_and(|lease|lease.id==watchdog_id) {
+                match guard.revert(&watchdog_id).await {
+                    Ok(())=>break,
+                    Err(error)=>tracing::warn!(%error,"Display watchdog recovery will retry"),
+                }
+                tokio::time::sleep(Duration::from_secs(1)).await;
+            }
         });
         let application=tokio::time::timeout(Duration::from_secs(8),self.driver.apply(&lease.draft)).await.map_err(|_|anyhow::anyhow!("Display application timed out")).and_then(|result|result);
         if let Err(error)=application {
@@ -83,15 +90,22 @@ impl<D:OutputDriver> DisplayGuard<D> {
         if lease.id!=id{bail!("Stale preview id");}
         if lease.deadline.is_some_and(|deadline|tokio::time::Instant::now()>=deadline){bail!("Preview expired; automatic recovery will restore the layout");}
         if !equivalent(&self.driver.read().await?,&lease.draft){bail!("Display state changed since preview; keep refused");}
+        if lease.deadline.is_some_and(|deadline|tokio::time::Instant::now()>=deadline){bail!("Preview expired during readback; keep refused");}
         self.clear_journal()?;*active=None;Ok(())
     }
     pub async fn recover(&self)->Result<bool> {
         if !self.journal.exists(){return Ok(false);}
+        nirava_core::transaction::ensure_regular_path(&self.journal)?;
+        if std::fs::metadata(&self.journal)?.len()>4_194_304{bail!("Display recovery journal is too large");}
         let lease:Lease=serde_json::from_slice(&std::fs::read(&self.journal)?)?;
         if lease.session_key!=session_key(){bail!("Pending preview belongs to another session; recovery did not touch displays");}
         self.restore(&lease).await?;self.clear_journal()?;Ok(true)
     }
     async fn restore(&self,lease:&Lease)->Result<()> {
+        tokio::time::timeout(Duration::from_secs(16),self.restore_inner(lease)).await
+            .map_err(|_|anyhow::anyhow!("Display recovery timed out; the journal is retained for retry"))?
+    }
+    async fn restore_inner(&self,lease:&Lease)->Result<()> {
         let current=self.driver.read().await?;
         let mut restore=current.iter().map(|o|lease.baseline.iter().find(|b|b.connector==o.connector&&b.identity==o.identity).cloned().unwrap_or_else(||o.clone())).collect::<Vec<_>>();
         if restore.is_empty(){bail!("No connected display remains for recovery");}
@@ -110,9 +124,9 @@ impl<D:OutputDriver> DisplayGuard<D> {
         let parent=self.journal.parent().ok_or_else(||anyhow::anyhow!("Journal parent missing"))?;
         std::fs::create_dir_all(parent)?;std::fs::set_permissions(parent,std::os::unix::fs::PermissionsExt::from_mode(0o700))?;
         let mut file=std::fs::OpenOptions::new().create_new(true).write(true).mode(0o600).open(&self.journal)?;
-        file.write_all(&serde_json::to_vec(lease)?)?;file.sync_all()?;Ok(())
+        file.write_all(&serde_json::to_vec(lease)?)?;file.sync_all()?;std::fs::File::open(parent)?.sync_all()?;Ok(())
     }
-    fn clear_journal(&self)->Result<()>{if self.journal.exists(){std::fs::remove_file(&self.journal)?;}Ok(())}
+    fn clear_journal(&self)->Result<()>{if self.journal.exists(){std::fs::remove_file(&self.journal)?;if let Some(parent)=self.journal.parent(){std::fs::File::open(parent)?.sync_all()?;}}Ok(())}
 }
 
 fn equivalent(a:&[OutputState],b:&[OutputState])->bool {
@@ -122,17 +136,33 @@ fn equivalent(a:&[OutputState],b:&[OutputState])->bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[derive(Clone)]struct Fake {state:Arc<Mutex<Vec<OutputState>>>}
+    #[derive(Clone)]struct Fake {state:Arc<Mutex<Vec<OutputState>>>,fail_apply:Arc<std::sync::atomic::AtomicBool>,read_delay:Arc<std::sync::atomic::AtomicU64>}
     #[async_trait]impl OutputDriver for Fake {
-        async fn read(&self)->Result<Vec<OutputState>>{Ok(self.state.lock().await.clone())}
-        async fn apply(&self,layout:&[OutputState])->Result<()>{*self.state.lock().await=layout.to_vec();Ok(())}
+        async fn read(&self)->Result<Vec<OutputState>>{let delay=self.read_delay.load(std::sync::atomic::Ordering::SeqCst);if delay>0{tokio::time::sleep(Duration::from_millis(delay)).await;}Ok(self.state.lock().await.clone())}
+        async fn apply(&self,layout:&[OutputState])->Result<()>{if self.fail_apply.swap(false,std::sync::atomic::Ordering::SeqCst){bail!("Temporary driver failure");}*self.state.lock().await=layout.to_vec();Ok(())}
     }
-    fn setup(dir:&std::path::Path)->(Arc<DisplayGuard<Fake>>,Fake,Vec<OutputState>){let baseline=nirava_core::Snapshot::demo().displays.outputs;let fake=Fake{state:Arc::new(Mutex::new(baseline.clone()))};(DisplayGuard::new(fake.clone(),dir.join("pending.json")),fake,baseline)}
+    fn setup(dir:&std::path::Path)->(Arc<DisplayGuard<Fake>>,Fake,Vec<OutputState>){let baseline=nirava_core::Snapshot::demo().displays.outputs;let fake=Fake{state:Arc::new(Mutex::new(baseline.clone())),fail_apply:Arc::new(std::sync::atomic::AtomicBool::new(false)),read_delay:Arc::new(std::sync::atomic::AtomicU64::new(0))};(DisplayGuard::new(fake.clone(),dir.join("pending.json")),fake,baseline)}
     #[tokio::test(start_paused=true)]async fn watchdog_reverts_without_gui()->Result<()> {
         let dir=tempfile::tempdir()?;let(guard,fake,baseline)=setup(dir.path());let mut draft=baseline.clone();draft[0].scale=1.5;
         guard.preview(draft,Duration::from_secs(15)).await?;tokio::task::yield_now().await;
         tokio::time::advance(Duration::from_secs(16)).await;tokio::task::yield_now().await;
         assert!(equivalent(&fake.read().await?,&baseline));assert!(guard.active().await.is_none());Ok(())
+    }
+    #[tokio::test(start_paused=true)]async fn watchdog_retries_a_transient_recovery_failure()->Result<()> {
+        let dir=tempfile::tempdir()?;let(guard,fake,baseline)=setup(dir.path());let mut draft=baseline.clone();draft[0].scale=1.5;
+        guard.preview(draft,Duration::from_secs(15)).await?;
+        fake.fail_apply.store(true,std::sync::atomic::Ordering::SeqCst);tokio::task::yield_now().await;
+        tokio::time::advance(Duration::from_secs(16)).await;tokio::task::yield_now().await;
+        assert!(guard.active().await.is_some());assert!(dir.path().join("pending.json").exists());
+        tokio::time::advance(Duration::from_secs(2)).await;tokio::task::yield_now().await;
+        assert!(guard.active().await.is_none());assert!(equivalent(&fake.read().await?,&baseline));Ok(())
+    }
+    #[tokio::test(start_paused=true)]async fn keep_refuses_readback_that_crosses_the_deadline()->Result<()> {
+        let dir=tempfile::tempdir()?;let(guard,fake,baseline)=setup(dir.path());let mut draft=baseline;draft[0].scale=1.5;
+        let lease=guard.preview(draft,Duration::from_secs(15)).await?;
+        fake.read_delay.store(16000,std::sync::atomic::Ordering::SeqCst);
+        assert!(guard.keep_session_only(&lease.id).await.is_err());
+        assert!(dir.path().join("pending.json").exists());Ok(())
     }
     #[tokio::test]async fn process_restart_recovers_from_journal()->Result<()> {
         let dir=tempfile::tempdir()?;let(guard,fake,baseline)=setup(dir.path());let mut draft=baseline.clone();draft[0].scale=1.25;

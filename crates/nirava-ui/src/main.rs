@@ -1,3 +1,4 @@
+mod apps;
 use adw::prelude::*;
 use gtk::glib;
 use nirava_core::*;
@@ -18,26 +19,28 @@ enum Action {
     Restore(String),
     Suspend,
     Refresh,
+    RefreshApps,
     Stop,
 }
-enum Update {Snapshot(Snapshot),Message(String),Failure(String,Option<usize>),Preview(serde_json::Value),Layout(nirava_backends::display_guard::Lease)}
+enum Update {Apps(nirava_core::apps::AppsInventory),Snapshot(Snapshot),Message(String),Failure(String,Option<usize>),Preview(serde_json::Value),Layout(nirava_backends::display_guard::Lease)}
 
 fn main() {
     let args=std::env::args().skip(1).collect::<Vec<_>>();
     if args.iter().any(|s|s=="--help") {
-        println!("Nirava settings\nUsage: nirava [--demo] [--page displays|sound|power|system] [--smoke-test]\nDefault: read-only discovery. Writes require an explicitly writable backend.");return;
+        println!("Nirava settings\nUsage: nirava [--demo] [--page displays|sound|power|system|apps] [--enable-package-actions] [--smoke-test]\nDefault: read-only discovery. Desktop writes require an explicitly writable backend. Package terminal handoff requires --enable-package-actions.");return;
     }
+    let package_actions=args.iter().any(|s|s=="--enable-package-actions");
     let demo=args.iter().any(|s|s=="--demo");
     let smoke=args.iter().any(|s|s=="--smoke-test");
     let capture=args.windows(2).find(|w|w[0]=="--snapshot").map(|w|w[1].clone());
     let test_width=args.windows(2).find(|w|w[0]=="--test-width").and_then(|w|w[1].parse::<i32>().ok());
     let page=args.windows(2).find(|w|w[0]=="--page").map(|w|w[1].clone()).unwrap_or_else(||"displays".into());
     let app=adw::Application::builder().application_id(APP_ID).build();
-    app.connect_activate(move|app|build_window(app,demo,smoke,&page,capture.clone(),test_width));
+    app.connect_activate(move|app|build_window(app,demo,smoke,&page,capture.clone(),test_width,package_actions&&!demo));
     app.run_with_args(&["nirava"]);
 }
 
-fn build_window(app:&adw::Application,demo:bool,smoke:bool,initial_page:&str,capture:Option<String>,test_width:Option<i32>) {
+fn build_window(app:&adw::Application,demo:bool,smoke:bool,initial_page:&str,capture:Option<String>,test_width:Option<i32>,package_actions:bool) {
     if let Some(window)=app.active_window(){window.present();return;}
     let builder=gtk::Builder::from_string(include_str!("../../../data/nirava-window.ui"));
     let window:adw::ApplicationWindow=builder.object("window").expect("window template");
@@ -58,7 +61,8 @@ fn build_window(app:&adw::Application,demo:bool,smoke:bool,initial_page:&str,cap
     let definitions=[("displays","Displays","video-display-symbolic","monitor resolution refresh scale rotation layout"),
         ("sound","Sound","audio-speakers-symbolic","speaker output volume mute microphone input applications"),
         ("power","Power","preferences-system-power-symbolic","idle sleep screen lock suspend caffeine battery"),
-        ("system","System","preferences-system-details-symbolic","session diagnostics hardware compositor backup")];
+        ("system","System","preferences-system-details-symbolic","session diagnostics hardware compositor backup"),
+        ("apps","Apps","system-software-install-symbolic","applications packages install uninstall remove update software flatpak rpm dnf")];
     for (id,title,icon,_) in definitions {
         let nav=gtk::ListBoxRow::new();nav.set_widget_name(id);
         let content=gtk::Box::new(gtk::Orientation::Horizontal,12);content.set_margin_top(12);content.set_margin_bottom(12);content.set_margin_start(12);content.set_margin_end(12);
@@ -67,20 +71,23 @@ fn build_window(app:&adw::Application,demo:bool,smoke:bool,initial_page:&str,cap
         let group=adw::PreferencesGroup::new();group.set_title(title);preferences.add(&group);stack.add_named(&preferences,Some(id));groups.borrow_mut().push(group);
     }
     let stack_for_nav=stack.clone();let page_for_nav=page.clone();let split_for_nav=split.clone();
+    let app_actions=tx.clone();
     navigation.connect_row_selected(move|_,row|if let Some(row)=row {
         let id=row.widget_name();stack_for_nav.set_visible_child_name(&id);
-        page_for_nav.set_title(match id.as_str(){"sound"=>"Sound","power"=>"Power","system"=>"System",_=>"Displays"});
+        page_for_nav.set_title(match id.as_str(){"sound"=>"Sound","power"=>"Power","system"=>"System","apps"=>"Apps",_=>"Displays"});
+        if id=="apps"{let _=app_actions.send(Action::RefreshApps);}
         split_for_nav.set_show_content(true);
     });
     let nav_for_search=navigation.clone();
     search.connect_search_changed(move|entry|{
         let query=entry.text().to_lowercase();
         for (i,(_,title,_,keywords)) in definitions.iter().enumerate(){if let Some(row)=nav_for_search.row_at_index(i as i32){row.set_visible(query.is_empty()||title.to_lowercase().contains(&query)||keywords.contains(&query));}}
-        for i in 0..4 {if let Some(row)=nav_for_search.row_at_index(i){if row.is_visible(){nav_for_search.select_row(Some(&row));break;}}}
+        for i in 0..5 {if let Some(row)=nav_for_search.row_at_index(i){if row.is_visible(){nav_for_search.select_row(Some(&row));break;}}}
     });
     let index=definitions.iter().position(|(id,_,_,_)|*id==initial_page).unwrap_or(0);
     navigation.select_row(navigation.row_at_index(index as i32).as_ref());
     render(&snapshot.borrow(),&groups.borrow(),&tx);
+    apps::render(&if demo{nirava_core::apps::AppsInventory::demo()}else{Default::default()},&groups.borrow()[4],&tx,demo,package_actions);
     let weak=window.downgrade();let redraw_groups=groups.clone();let current=snapshot.clone();let actions=tx.clone();
     let last_signature=Rc::new(RefCell::new(String::new()));
     let layout_for_updates=pending_layout.clone();
@@ -91,10 +98,13 @@ fn build_window(app:&adw::Application,demo:bool,smoke:bool,initial_page:&str,cap
                 let signature=serde_json::to_string(&state).unwrap_or_default();
                 if *last_signature.borrow()!=signature {
                     *last_signature.borrow_mut()=signature;
-                    banner.set_title(if demo{"Simulation — no hardware or settings changes"}else if state.read_only{"Read-only preview — desktop configuration is unchanged"}else{"Writable backend connected — review file changes before Apply"});
+                    banner.set_title(if demo{"Simulation — no hardware or settings changes"}else if package_actions{"Package actions enabled — review and confirm in your package manager"}else if state.read_only{"Read-only preview — desktop configuration is unchanged"}else{"Writable backend connected — review file changes before Apply"});
+                    if current.borrow().read_only!=state.read_only{FORCED.with(|pages|pages.borrow_mut().fill(true));}
+                    if current.borrow().sound.generation!=state.sound.generation{FORCED.with(|pages|pages.borrow_mut()[1]=true);}
                     *current.borrow_mut()=state;
                 }
             }
+            Update::Apps(state)=>apps::render(&state,&redraw_groups.borrow()[4],&actions,demo,package_actions),
             Update::Message(message)=>toasts.add_toast(adw::Toast::new(&message)),
             Update::Failure(message,index)=>{toasts.add_toast(adw::Toast::new(&message));if let Some(index)=index{FORCED.with(|pages|pages.borrow_mut()[index]=true);}},
             Update::Preview(preview)=>show_preview(&window,&actions,preview),
@@ -120,7 +130,7 @@ fn capture_window(window:&adw::ApplicationWindow,path:&str)->anyhow::Result<()> 
     renderer.render_texture(&node,None).save_to_png(path)?;Ok(())
 }
 
-thread_local! {static ROWS:RefCell<Vec<Vec<gtk::Widget>>>=RefCell::new(vec![vec![],vec![],vec![],vec![]]);}
+thread_local! {static ROWS:RefCell<Vec<Vec<gtk::Widget>>>=RefCell::new(vec![vec![],vec![],vec![],vec![],vec![]]);}
 thread_local! {static SIGNATURES:RefCell<Vec<String>>=RefCell::new(vec![String::new();4]);}
 thread_local! {static FORCED:RefCell<Vec<bool>>=RefCell::new(vec![false;4]);}
 fn add(group:&adw::PreferencesGroup,index:usize,widget:&impl IsA<gtk::Widget>) {
@@ -328,6 +338,14 @@ fn backend_loop(demo:bool,rx:mpsc::Receiver<Action>,updates:Sender<Update>) {
         match rx.recv_timeout(Duration::from_secs(2)) {
             Ok(Action::Stop)|Err(mpsc::RecvTimeoutError::Disconnected)=>break,
             Ok(Action::Refresh)|Err(mpsc::RecvTimeoutError::Timeout)=>continue,
+            Ok(Action::RefreshApps)=>{
+                let inventory=runtime.block_on(async {
+                    if demo{return nirava_core::apps::AppsInventory::demo();}
+                    if let Some(connection)=connection.as_ref(){if let Ok(proxy)=service_proxy(connection).await{if let Ok(json)=proxy.call::<_,_,String>("GetApps",&()).await{if let Ok(state)=serde_json::from_str(&json){return state;}}}}
+                    nirava_backends::apps::discover().await
+                });
+                let _=updates.send(Update::Apps(inventory));continue;
+            },
             Ok(action)=>{
                 if demo{let _=updates.send(Update::Message("Simulation does not write to hardware".into()));continue;}
                 let reset_page=match &action{Action::Volume(..)|Action::Mute(..)|Action::Default(..)=>Some(1),Action::Caffeine(..)=>Some(2),_=>None};

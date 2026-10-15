@@ -8,7 +8,8 @@
 A native Linux desktop control center for **Niri** and **Hyprland** on **Wayland**,
 built with **Rust**, **GTK 4**, and **libadwaita**.
 Manage sound through PipeWire/PulseAudio, preview display layouts, and review
-power settings alongside Noctalia and existing session tools.
+power settings alongside Noctalia and existing session tools. Browse installed
+applications, Fedora RPM packages, and user/system Flatpak apps.
 Rust workspace: `nirava` (window), `nirava-sessiond` (session D-Bus backend),
 and `niravactl` (inspection and reviewed operations).
 
@@ -47,6 +48,9 @@ bash tools/build-with-runtime-libs.sh
 ./target/runtime-build/debug/nirava --page system
 ```
 
+The helper uses Fedora’s `/usr/bin/python3` for GI; `NIRAVA_PYTHON` can select
+another interpreter with the GTK/Adwaita bindings.
+
 This fallback links the already installed runtime libraries directly and
 checks their minimum versions. Normal development/CI builds use pkg-config
 and the development packages. The final command reads your real session;
@@ -62,11 +66,12 @@ normal desktop user.
 
 | Component | Implemented | Remaining release checks |
 |---|---|---|
-| Window | Native build and smoke tests; responsive Adwaita sidebar, search, four pages; wide/narrow demo screenshots inspected | Keyboard/screen-reader acceptance and launcher/laptop checks |
+| Window | Native build and smoke tests; responsive Adwaita sidebar, search, five pages; wide/narrow demo screenshots inspected | Keyboard/screen-reader acceptance and launcher/laptop checks |
 | Discovery | Real Niri/Hyprland IPC probes, output inventory, idle/display owners, logind capabilities/inhibitors | Laptop validation and broader compositor support |
 | Audio | Native libpulse worker builds; real PipeWire inventory, subscriptions, defaults, volume/mute, playback streams, stale-server refusal and write readback | Human-operated device mutation tests |
 | Noctalia power | TOML editing preserving numeric types/comments, review/commit, backups and Restore in System, caffeine inhibitor, gated manual Suspend | Effective-engine confirmation and human suspend acceptance |
 | Displays | Editor, timed confirmation, Niri validation, supervised 15-second preview, journal recovery, hotplug-aware revert; pure KDL writer | Persistent Save integration, real supervised crash tests, laptop/kanshi support |
+| Apps | Search/open desktop apps; local RPM and scoped Flatpak inventory; reviewed install/update/remove commands and optional interactive terminal handoff | Human transaction acceptance, available-software catalog, other native package managers |
 | Safety | Read-only default, temporary-file/fake-driver tests, guarded restore | Whole-process crash and real hardware acceptance |
 
 `nirava-sessiond --allow-writes` is an explicit opt-in for the implemented
@@ -83,12 +88,59 @@ it does not save compositor files. Persistent Save remains unavailable.
 Noctalia remains the desktop idle owner. Hypridle, its existing locker, and
 kanshi remain the laptop owners. Nirava does not run a second idle engine.
 
+## Apps and package management
+
+Open Apps with `nirava --page apps`. The application list follows the desktop's
+GIO application registry, including visibility and user overrides. Package views
+show locally installed RPM packages and Flatpak apps, with user/system scope,
+version, architecture, and Flatpak remote. Search narrows the list; at most 100
+matching rows are displayed. Refresh rereads local inventory without refreshing
+repository metadata or starting package transactions.
+
+Review install, update, or removal commands in the package view. Flatpak installs
+use a selected existing remote; RPM installs take an exact package name. In the
+default read-only mode, you can copy commands. To enable terminal handoff:
+
+```sh
+./target/runtime-build/debug/nirava --page apps --enable-package-actions
+```
+
+**Continue in Terminal** opens DNF or Flatpak, which resolves dependencies,
+requests authentication when necessary, and asks for final confirmation. Review
+the complete dependency/removal list there. Nirava does not automatically approve
+transactions, add repositories, delete Flatpak app data, force operations, or run
+a root daemon. RPM removal disables automatic cleanup of unused dependencies;
+other required dependent removals can still be proposed by DNF. Removal targets
+the selected installed RPM version. Flatpak targets retain scope, architecture,
+and branch. DNF actions are disabled on OSTree systems.
+
+The terminal owns progress, cancellation and errors. Closing it does not guarantee
+rollback; let active transactions finish, then use Refresh to check inventory.
+Nirava does not claim success when a terminal merely opens. Supported terminals
+are Kitty, foot, GNOME Terminal, Konsole, and xterm. Demo mode disables app launches
+and terminal handoff. No package changes are made by automated tests.
+
+CLI inspection and command review (the latter prints only):
+
+```sh
+niravactl apps --json
+niravactl apps --demo --json
+niravactl package-plan rpm install vlc
+niravactl package-plan flatpak-user install org.gnome.Calculator --remote flathub
+```
+
+This is an installed-software manager with interactive transactions. An online
+app catalog, AppStream descriptions/screenshots, a native transaction-progress UI,
+Flatpak permission editing, custom Flatpak installations, AppImage integration,
+and other native package managers remain future work.
+
 ## Project guide
 
 - [Implementation plan](docs/implementation-plan.md): architecture, remaining milestones, release gates.
 - [Testing](docs/testing.md): safe automated checks and manual acceptance.
 - [D-Bus API](docs/dbus.md): versioned interface and operation semantics.
 - [Verification record](docs/verification.md): checks actually run and unresolved gates.
+- [Code review](docs/code-review.md): resolved issues and remaining engineering limits.
 - `data/`: window template, icon, desktop entry, and user-unit definitions.
 
 GPL-3.0-or-later. The implementation plan records the selected existing-engine

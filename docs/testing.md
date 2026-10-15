@@ -57,3 +57,23 @@ Keep an alternate terminal/recovery login available when testing display modes.
 6. Repeat with the Hyprland laptop and its actual hypridle/kanshi setup.
 
 Do not mark v1 complete on the strength of fixture tests alone.
+
+## Apps and package manager acceptance
+
+Automated tests cover RPM/multilib/version parsing, actual Flatpak column format,
+user/system scoping, complete references, identifier rejection and interactive
+command policies. Private-bus tests require fictional inventory and no writes
+with both demo flag combinations. Frontend checks render all five pages against
+the demo backend; no real apps or terminals are launched.
+
+Read-only checks: `niravactl apps --json`, compare counts with `rpm -qa` and
+`flatpak --user/--system list --app`; inspect Apps search, all four filters,
+remote selection and empty/unavailable/error states at wide/narrow widths.
+Check the default review offers only Cancel and Copy command.
+
+Human acceptance, only on a disposable test system with explicit authorization:
+launch a test desktop app, then exercise one install/update/remove per package
+source through --enable-package-actions. Verify displayed commands, dependency
+review, authentication, cancellation before consent, errors, and refreshed
+inventory. Confirm Flatpak data remains and DNF keeps required protections.
+Never automate a real package transaction or treat terminal spawn as success.

@@ -3,7 +3,7 @@
 ## Product decisions
 
 Build an independent native Adwaita app, initially for the Fedora Niri desktop
-and Hyprland laptop. Displays, Sound, Power, and System are the first pages.
+and Hyprland laptop. Displays, Sound, Power, System, and Apps are the first pages.
 NetworkManager, BlueZ, and Input follow later. Generic Sway/Mango/River/
 Wayfire/labwc support follows verified native backends; GNOME and KDE are not
 initial targets.
@@ -48,8 +48,9 @@ Read → stage → parse/validate → show exact changes → explicit Apply → 
 source hash → timestamped backup → atomic replacement → reload → readback.
 Restore refuses a file edited since Nirava wrote it and verifies backup hashes.
 Hash checks reduce races; an external writer is not made cooperative by them.
-Parent symlinks and multi-file crash atomicity need further hardening before
-integration is released.
+Symlinked targets, backups and existing ancestors are refused. The final
+check-to-rename race with an uncooperative external writer and multi-file crash
+atomicity need further hardening before integration is released.
 
 Niri runtime changes use native IPC. A complete layout must retain at least
 one enabled head, use advertised modes, identify the same physical outputs,
@@ -87,6 +88,36 @@ balance, handle device/server disappearance, identify stale targets, subscribe
 to changes, and verify writes. v1 includes default sink/source, volume, mute,
 and playback-stream controls. Pro Audio routing remains outside scope.
 
+## Apps and packages
+
+The Apps page uses GIO's application registry for searchable launchable desktop
+apps and a separate on-demand inventory for RPM and user/system Flatpak apps.
+Inventory uses bounded local `rpm -qa`, `flatpak list`, and `flatpak remotes`
+queries; no metadata refresh or package write happens during discovery. It is
+not part of the two-second desktop snapshot poll.
+
+Typed requests build exact command argument vectors. There is no arbitrary
+command RPC or package executor in the backend. `GetApps` returns read-only
+inventory; the CLI can print an interactive command without executing it.
+By default, the UI offers review/copy only. `--enable-package-actions` permits
+an explicit review dialog to hand off a fixed command to a known terminal.
+DNF/Flatpak then own dependency resolution, final consent, authentication,
+progress and cancellation. Never mark a transaction successful from terminal
+spawn alone; Refresh is an inventory read, not an execution receipt.
+
+Preserve Flatpak user/system scope, architecture, branch and app data. Select
+existing remotes only. Reject paths, wildcard/multi-target requests, command
+options and shell syntax. RPM removals target the installed version and disable
+unused-dependency autoremove; DNF still reports required dependent removals.
+Disable DNF mutation handoff on OSTree systems. Tests must never open terminals,
+launch real applications, or execute a package transaction.
+
+A future native transaction UI requires PackageKit/libdnf/libflatpak adapters,
+review of dependency and permission changes, transaction state/reconnection,
+authentication and cancellation acceptance before enabling writes. AppStream
+catalog browsing, permission management, other package formats and custom Flatpak
+installations are separate milestones.
+
 ## Milestones and acceptance
 
 | Milestone | Required result | Status |
@@ -97,6 +128,7 @@ and playback-stream controls. Pro Audio routing remains outside scope.
 | M3 display preview | Editor, apply, 15-second revert, process-kill/restart recovery, unplug/replug | Editor/dialog built; fake-driver recovery tests pass; supervised hardware checks pending |
 | M4 persistence/setup | Include/profile integration, exact diff, validation, multi-file recovery, Restore | Pure Niri KDL writer only |
 | M5 laptop | Hypridle + kanshi integration; manual Hyprland tests with external display | Read-only Hyprland discovery only |
+| Apps preview | Installed apps/packages, scoped inventory, typed reviews, terminal handoff | Automated checks and native page build; human transaction acceptance pending |
 | M6 release | Native CI, packaging, accessibility, documentation, all v1 gates | Packaging definitions and safe checks in progress |
 
 ## Upstream references and comparable projects
@@ -117,3 +149,6 @@ ReSet is the closest broad Rust/GTK settings reference; Nirava keeps its own
 implementation so display transactions and existing-engine integration can
 be designed around these two machines. Review upstream licenses before copying
 code. No external code has been vendored into this project.
+
+- [DNF5 configuration](https://dnf5.readthedocs.io/en/stable/dnf5.conf.5.html)
+- [Flatpak commands](https://docs.flatpak.org/en/latest/flatpak-command-reference.html)

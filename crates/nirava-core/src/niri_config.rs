@@ -13,10 +13,17 @@ pub fn patch_outputs(text:&str,outputs:&[OutputState])->Result<String> {
     let doc=parse(text)?;
     let mut edits:Vec<(std::ops::Range<usize>,String)>=vec![];
     let mut appended=String::new();
+    let mut connectors=std::collections::HashSet::new();
+    let mut selected=std::collections::HashSet::new();
     for output in outputs {
+        if output.connector.is_empty()||!connectors.insert(&output.connector){bail!("Empty or duplicate output connector");}
+        transform(&output.transform)?;
+        if !output.scale.is_finite()||!(0.5..=4.0).contains(&output.scale){bail!("Invalid display scale");}
+        if output.enabled&&(output.mode.width==0||output.mode.height==0||output.mode.refresh_millihz==0){bail!("Enabled display needs a valid mode");}
         let candidates=doc.nodes().iter().filter(|n|matches(n,output)).collect::<Vec<_>>();
         if candidates.len()>1{bail!("Multiple output definitions match {}; select a single source file",output.connector);}
-        let Some(node)=candidates.first() else {appended.push_str(&new_output(output));continue;};
+        let Some(node)=candidates.first() else {appended.push_str(&new_output(output)?);continue;};
+        if !selected.insert(span(node).start){bail!("Two output requests match the same configuration block");}
         let body=node.children().ok_or_else(||anyhow::anyhow!("Output block has no body"))?;
         let properties=[
             ("mode",format!("mode \"{}x{}@{:.3}\"",output.mode.width,output.mode.height,output.mode.refresh_millihz as f64/1000.0)),
@@ -57,9 +64,9 @@ fn transform(value:&str)->Result<&'static str>{Ok(match value {
     "Normal"|"normal"=>"normal","90"=>"90","180"=>"180","270"=>"270","Flipped"|"flipped"=>"flipped",
     "Flipped90"|"flipped-90"=>"flipped-90","Flipped180"|"flipped-180"=>"flipped-180","Flipped270"|"flipped-270"=>"flipped-270",_=>bail!("Unknown transform"),
 })}
-fn new_output(o:&OutputState)->String {
+fn new_output(o:&OutputState)->Result<String> {
     let identity=serde_json::to_string(if o.identity.is_empty(){&o.connector}else{&o.identity}).unwrap_or_default();
-    format!("\noutput {identity} {{\n    {}\n    mode \"{}x{}@{:.3}\"\n    scale {}\n    position x={} y={}\n    transform \"{}\"\n    {}\n}}\n",if o.enabled{""}else{"off"},o.mode.width,o.mode.height,o.mode.refresh_millihz as f64/1000.0,o.scale,o.x,o.y,transform(&o.transform).unwrap_or("normal"),if o.vrr_enabled{"variable-refresh-rate"}else{""})
+    Ok(format!("\noutput {identity} {{\n    {}\n    mode \"{}x{}@{:.3}\"\n    scale {}\n    position x={} y={}\n    transform \"{}\"\n    {}\n}}\n",if o.enabled{""}else{"off"},o.mode.width,o.mode.height,o.mode.refresh_millihz as f64/1000.0,o.scale,o.x,o.y,transform(&o.transform)?,if o.vrr_enabled{"variable-refresh-rate"}else{""}))
 }
 
 #[cfg(test)]
@@ -80,6 +87,15 @@ mod tests {
         let (root,managed)=extract_outputs(text,&[output()])?;
         assert!(root.starts_with("input { keyboard { xkb { layout \"us\"; }; }; }\n"));
         assert!(root.contains("include \"nirava-displays.kdl\""));assert!(managed.contains("output \"DP-5\""));Ok(())
+    }
+    #[test]
+    fn duplicate_requests_invalid_transforms_and_aliases_are_refused() {
+        let first=output();let mut second=first.clone();
+        assert!(patch_outputs("",&[first.clone(),second.clone()]).is_err());
+        second.transform="invalid".into();assert!(patch_outputs("",&[second]).is_err());
+        let mut alias=first.clone();alias.connector="HDMI-A-1".into();
+        let text="output \"Example Screen Test\" { scale 1; }\n";
+        assert!(patch_outputs(text,&[first,alias]).is_err());
     }
     #[test]
     fn duplicate_definitions_are_refused() {

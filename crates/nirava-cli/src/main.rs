@@ -10,6 +10,12 @@ struct Args {#[command(subcommand)] command:Action}
 enum Action {
     Status {#[arg(long)] json:bool,#[arg(long)] demo:bool},
     Doctor,
+    /// Read installed RPM packages and Flatpak apps without refreshing repositories.
+    Apps {#[arg(long)] json:bool, #[arg(long)] demo:bool},
+    /// Print a reviewed interactive command; never executes package operations.
+    PackagePlan {#[arg(value_parser=["rpm","flatpak-user","flatpak-system"])] source:String,
+        #[arg(value_parser=["install","update","remove"])] action:String, target:String,
+        #[arg(long,default_value="")] remote:String},
     StagePower {#[arg(long)] screen_off:u64,#[arg(long,default_value_t=0)] lock:u64,#[arg(long)] sleep:u64},
     Commit {id:String,#[arg(long)] yes:bool},
     Cancel {id:String},
@@ -50,6 +56,23 @@ async fn main()->Result<()> {
             if json {println!("{}",serde_json::to_string_pretty(&snapshot)?);} else {print_snapshot(&snapshot);}
         }
         Action::Doctor=>print_snapshot(&local_snapshot().await),
+        Action::Apps{json,demo}=>{
+            let inventory=if demo{nirava_core::apps::AppsInventory::demo()}else{
+                let remote=async{let connection=zbus::Connection::session().await?;let text:String=proxy(&connection).await?.call("GetApps",&()).await?;Ok::<_,anyhow::Error>(serde_json::from_str(&text)?)}.await;
+                match remote{Ok(state)=>state,Err(_)=>nirava_backends::apps::discover().await}
+            };
+            if json{println!("{}",serde_json::to_string_pretty(&inventory)?);}else{
+                for package in &inventory.packages{println!("{}\t{}\t{}\t{}",package.source.label(),package.id,package.version,package.origin);}
+                for error in &inventory.errors{eprintln!("{error}");}
+            }
+        }
+        Action::PackagePlan{source,action,target,remote}=>{
+            use nirava_core::apps::*;
+            let source=match source.as_str(){"rpm"=>PackageSource::Rpm,"flatpak-user"=>PackageSource::FlatpakUser,_=>PackageSource::FlatpakSystem};
+            let action=match action.as_str(){"install"=>PackageAction::Install,"update"=>PackageAction::Update,_=>PackageAction::Remove};
+            let plan=PackagePlan::build(PackageRequest{source,action,target,remote}).map_err(anyhow::Error::msg)?;
+            println!("{}\n{}\nReview dependencies and confirm in the package manager. Nothing was executed.",plan.description,plan.display_command());
+        }
         Action::StagePower{screen_off,lock,sleep}=>{
             let settings=IdleSettings{screen_off_secs:screen_off,lock_secs:lock,suspend_secs:sleep,lock_before_suspend:true};
             settings.validate().map_err(anyhow::Error::msg)?;

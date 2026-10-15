@@ -15,7 +15,8 @@ pub fn read_noctalia(text: &str) -> Result<IdleSettings> {
             if found[index]{bail!("Multiple behaviors own this action; select a single owner");}found[index]=true;
             if action=="suspend"{state.lock_before_suspend=false;}
             if action=="lock_and_suspend"{state.lock_before_suspend=true;}
-            if item.get("enabled").and_then(|i|i.as_bool()) == Some(false) { continue; }
+            let enabled=match item.get("enabled") {None=>true,Some(value)=>value.as_bool().ok_or_else(||anyhow::anyhow!("Known idle action has a non-boolean enabled flag"))?};
+            if !enabled { continue; }
             let timeout = item.get("timeout").and_then(|i|i.as_integer().map(|n|n as f64).or_else(||i.as_float())).ok_or_else(||anyhow::anyhow!("Known idle action has no numeric timeout"))?;
             if !timeout.is_finite() || !(0.0..=86400.0).contains(&timeout) { bail!("Unsupported idle duration"); }
             if timeout.fract()!=0.0{bail!("Fractional idle durations must be edited in the existing settings owner");}
@@ -33,9 +34,10 @@ pub fn read_noctalia(text: &str) -> Result<IdleSettings> {
 }
 
 pub fn edit_noctalia(text: &str, settings: &IdleSettings) -> Result<String> {
+    read_noctalia(text)?;
     settings.validate().map_err(anyhow::Error::msg)?;
     let mut doc = text.parse::<DocumentMut>()?;
-    let behavior = doc["idle"]["behavior"].as_table_like_mut().ok_or_else(|| anyhow::anyhow!("No known Noctalia idle behaviors; guided import is required"))?;
+    let behavior = doc.get_mut("idle").and_then(|idle|idle.get_mut("behavior")).and_then(|item|item.as_table_like_mut()).ok_or_else(|| anyhow::anyhow!("No known Noctalia idle behaviors; guided import is required"))?;
     let mut found = [false; 3];
     for (_, item) in behavior.iter_mut() {
         let action = item.get("action").and_then(|i|i.as_str()).unwrap_or("command").to_string();
@@ -128,6 +130,12 @@ mod tests {
     }
     #[test]
     fn fractional_durations_are_not_silently_rounded(){assert!(read_noctalia(&ORIGINAL.replace("1800.0","1800.5")).is_err());}
+    #[test]
+    fn malformed_idle_tables_and_enabled_flags_are_refused_without_panicking() {
+        assert!(edit_noctalia("idle = 42",&IdleSettings::default()).is_err());
+        assert!(edit_noctalia("[idle]\nbehavior = false",&IdleSettings::default()).is_err());
+        assert!(read_noctalia(&ORIGINAL.replace("enabled = true","enabled = 'yes'")).is_err());
+    }
     #[test]
     fn invalid_timeout_types_are_not_reported_as_disabled(){assert!(read_noctalia(&ORIGINAL.replace("1800.0","'30 minutes'")).is_err());}
 }

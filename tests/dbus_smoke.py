@@ -51,6 +51,13 @@ def inside():
                     time.sleep(0.1)
                 else:
                     raise AssertionError("Demo backend did not answer on the private bus")
+                inventory = run("apps", "--json")
+                assert inventory.returncode == 0, inventory.stderr
+                apps = json.loads(inventory.stdout)
+                assert apps["simulation"] is True
+                assert apps["loaded"] is True
+                assert len(apps["packages"]) == 2
+                assert {p["source"] for p in apps["packages"]} == {"rpm", "flatpak_user"}
                 assert state["read_only"] is True
                 assert state["schema_version"] == 1
                 assert state["sound"]["default_output"] == "demo-headset"

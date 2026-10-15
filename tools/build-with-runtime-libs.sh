@@ -5,7 +5,7 @@
 # runtime SONAMEs; use a separate build directory so normal builds stay clean.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
-python3 - <<'PY'
+"${NIRAVA_PYTHON:-/usr/bin/python3}" - <<'PY'
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")

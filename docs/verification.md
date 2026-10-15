@@ -6,26 +6,38 @@ Checked on the user's Fedora 45 Niri desktop on 2026-10-15.
 
 - Rust CLI and service compile, including native audio support linked through
   libpulse-binding's supported runtime-library fallback.
-- 26 unit tests: config preservation and round trips, backup/restore with
+- 43 unit tests: config preservation and round trips, backup/restore with
   concurrent-edit refusal, symlink refusal, Niri layout validation, simulated
   display watchdog/restart/hotplug recovery, command output bounds, stale audio
-  generations, and channel balance.
+  generations, channel balance, package identifier/command policy, exact RPM
+  removal versions, Flatpak formats/scopes, staging conflicts, ancestor/backup
+  symlinks, malformed idle input, aliased output edits, delayed display
+  confirmation, transient recovery failure, and expired queued audio writes.
 - Private-bus integration: GetSnapshot, config/audio write refusal with and
   without --allow-writes, and normal SIGTERM shutdown. Temporary XDG paths
-  remain empty. Test buses have no service directories or helper activation.
+  remain empty. Fictional Apps inventory is also checked. Test buses have no
+  service directories or helper activation.
 - Entire Rust workspace passes `DOCS_RS=1 cargo check`; this bypasses native
   linking, so it is a source/type check, not proof of a runnable window.
 - Installed GTK/Adwaita runtime loads the GtkBuilder window template through
   Python GI. The window was not presented by this template check.
 - Native window links through the local runtime-library fallback, runs all four
-  demo pages, and renders wide/narrow scenes without GTK warnings. Screenshots
+  original demo pages; the new Apps page also renders at 980/540 pixels.
+  Isolated frontend tests disable accessibility only on the test bus (GTK_A11Y),
+  which has no accessibility service; normal app accessibility stays enabled.
+  Screenshots
   of Nirava's own rendered scene were inspected; other apps were not captured.
 - Real GTK frontend and demo backend coexist on the isolated bus and exchange
   read-only snapshots. Their application/backend bus names are distinct.
 - Read-only `niravactl doctor` matches Niri DP-5 at 3440x1440 / 159.96 Hz /
   scale 1, detects Noctalia, reads logind suspend=yes / hibernate=na, and finds
   four native audio devices on PipeWire.
-- Desktop-entry validator passes.
+- Desktop-entry validator and build-helper shell syntax checks pass.
+- Read-only Apps inventory matched 2,782 RPM records, one user Flatpak and 13
+  default-system Flatpaks, with three configured scoped remotes and no errors.
+  Counts are a point-in-time observation, not a supported-machine requirement.
+- Apps screenshots at 980/540 pixels were visually inspected. Native frontend
+  tests exercise all five pages against an isolated demo backend.
 
 ## Pending / limitations
 
@@ -36,6 +48,7 @@ Checked on the user's Fedora 45 Niri desktop on 2026-10-15.
 - The user-unit definition is present, but not installed or enabled. Static
   systemd verification reports the expected missing `/usr/bin/nirava-sessiond`
   executable because no system deployment took place.
+- Real app launches and package transaction/terminal acceptance remain pending.
 - Real audio mutations, caffeine effectiveness, Noctalia reload/Restore,
   secure lock-before-suspend, and live display changes have not been tested.
 - Persistent display Save, multi-file integration, hypridle/kanshi editing,

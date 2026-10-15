@@ -34,3 +34,18 @@ Unix user.
 Sound snapshots contain a nonzero generation token. Pass that token back for
 mutations; a reconnect invalidates old tokens before a recycled device index
 can receive a stale request. Successful audio requests include state readback.
+
+## Apps inventory
+
+`GetApps() -> JSON` reads installed RPM packages and Flatpak applications on
+demand. Fields include `loaded`, `simulation`, package-manager availability,
+`immutable`, `packages`, configured `remotes` by scope, and per-source `errors`.
+A failed source is reported rather than shown as an empty successful query.
+`packages` retain source, exact app reference/package identity, version,
+architecture and origin. RPM origin is the installed database, not an inferred
+repository. Flatpak inventory covers user and default system installations.
+Demo backends return fictional inventory even when --allow-writes is passed.
+
+There is no package execution D-Bus method. Reviewed terminal handoff is a local
+UI action requiring --enable-package-actions; package-manager consent remains
+interactive. Package changes are not part of the config Restore mechanism.

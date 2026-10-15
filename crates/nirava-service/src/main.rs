@@ -18,6 +18,7 @@ struct Args {
 struct Manager {
     allow_writes:bool,
     demo:bool,
+    config_writes:Mutex<()>,
     staged:Mutex<HashMap<String,nirava_core::transaction::FileChange>>,
     caffeine:Mutex<Option<zbus::zvariant::OwnedFd>>,
     session_id:String,
@@ -60,7 +61,7 @@ impl Manager {
         let original=std::fs::read_to_string(&path)?;
         let proposed=nirava_core::config::edit_noctalia(&original,&settings)?;
         if proposed==original{anyhow::bail!("These settings already match the configuration");}
-        let change=nirava_core::transaction::FileChange::read(path,proposed,"Update Noctalia idle durations; reload the shell".into())?;
+        let change=nirava_core::transaction::FileChange::read_expected(path,&original,proposed,"Update Noctalia idle durations; reload the shell".into())?;
         let id=format!("power-{}",std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_nanos());
         let response=serde_json::json!({"id":id,"path":change.path,"before":settings_summary(&original),"after":settings,"description":change.description});
         let mut staged=self.staged.lock().await;
@@ -70,6 +71,7 @@ impl Manager {
     }
     async fn commit_impl(&self,id:&str)->Result<OperationResult> {
         self.permit()?;
+        let _write_guard=self.config_writes.lock().await;
         let change=self.staged.lock().await.remove(id).ok_or_else(||anyhow::anyhow!("Preview not found; create a fresh preview"))?;
         let state=self.snapshot().await;
         if state.session.idle_owners.as_slice()!=["noctalia"] {anyhow::bail!("Settings owner changed; commit refused");}
@@ -101,14 +103,20 @@ fn read_backups(writable:bool)->Vec<nirava_core::BackupInfo> {
     paths.sort();paths.reverse();paths.truncate(100);
     paths.into_iter().filter_map(|path|{
         let id=path.file_stem()?.to_str()?.to_string();if !id.starts_with("power-"){return None;}
-        if std::fs::symlink_metadata(&path).ok()?.file_type().is_symlink(){return None;}
-        if std::fs::metadata(&path).ok()?.len()>65536{return None;}
-        let committed:nirava_core::transaction::CommittedChange=serde_json::from_slice(&std::fs::read(path).ok()?).ok()?;
+        let committed=read_committed(&path).ok()?;
         if committed.path!=nirava_backends::power::noctalia_config(){return None;}
         let check=committed.check_restore();
         Some(nirava_core::BackupInfo{id,path:committed.path.display().to_string(),backup:committed.backup.display().to_string(),
             can_restore:writable&&check.is_ok(),reason:if !writable{"Read-only mode".into()}else{check.err().map(|e|e.to_string()).unwrap_or_default()}})
     }).collect()
+}
+fn read_committed(path:&std::path::Path)->Result<nirava_core::transaction::CommittedChange> {
+    nirava_core::transaction::ensure_regular_path(path)?;
+    if std::fs::metadata(path)?.len()>65536{anyhow::bail!("Backup journal is too large");}
+    use std::io::Read;
+    let mut bytes=Vec::new();std::fs::File::open(path)?.take(65537).read_to_end(&mut bytes)?;
+    if bytes.len()>65536{anyhow::bail!("Backup journal is too large");}
+    Ok(serde_json::from_slice(&bytes)?)
 }
 fn write_private(path:&PathBuf,bytes:&[u8])->Result<()> {
     use std::os::unix::fs::OpenOptionsExt;
@@ -122,6 +130,10 @@ fn json_result(result:Result<OperationResult>)->String {
 
 #[zbus::interface(name="io.github.Somchandra17.Nirava.Manager1")]
 impl Manager {
+    async fn get_apps(&self)->String {
+        let inventory=if self.demo {nirava_core::apps::AppsInventory::demo()} else {nirava_backends::apps::discover().await};
+        serde_json::to_string(&inventory).unwrap_or_default()
+    }
     async fn get_snapshot(&self)->String {serde_json::to_string(&self.snapshot().await).unwrap_or_default()}
     fn get_session_id(&self)->String {self.session_id.clone()}
     fn get_session_key(&self)->String {nirava_core::session_key()}
@@ -174,9 +186,10 @@ impl Manager {
     async fn restore_change(&self,id:&str)->String {
         let result=async{
             self.permit()?;
-            if !id.starts_with("power-")||!id[6..].chars().all(|c|c.is_ascii_digit())||id.len()>50{anyhow::bail!("Invalid backup identifier");}
+            let _write_guard=self.config_writes.lock().await;
+            if id.len()<=6||!id.starts_with("power-")||!id[6..].chars().all(|c|c.is_ascii_digit())||id.len()>50{anyhow::bail!("Invalid backup identifier");}
             let path=nirava_backends::state_home().join("nirava/transactions").join(format!("{id}.json"));
-            let committed:nirava_core::transaction::CommittedChange=serde_json::from_slice(&std::fs::read(path)?)?;
+            let committed=read_committed(&path)?;
             if committed.path!=nirava_backends::power::noctalia_config(){anyhow::bail!("Backup belongs to an unsupported integration");}
             committed.restore()?;nirava_backends::command("noctalia",&["msg","config-reload"]).await?;
             Ok(OperationResult::applied("Previous Noctalia configuration restored and reload requested"))
@@ -227,7 +240,7 @@ async fn main()->Result<()> {
         let guard=nirava_backends::display_guard::DisplayGuard::new(nirava_backends::display_guard::NiriDriver,PathBuf::from(runtime).join("nirava/pending-display.json"));
         guard.recover().await?;Some(guard)
     } else {None};
-    let manager=Manager {allow_writes:args.allow_writes,demo:args.demo,staged:Mutex::new(HashMap::new()),caffeine:Mutex::new(None),
+    let manager=Manager {allow_writes:args.allow_writes,demo:args.demo,config_writes:Mutex::new(()),staged:Mutex::new(HashMap::new()),caffeine:Mutex::new(None),
         enable_suspend:args.enable_suspend,displays:displays.clone(),
         session_id:std::env::var("XDG_SESSION_ID").unwrap_or_default(),
         #[cfg(feature="audio")] audio:nirava_backends::audio::AudioClient::new(),};

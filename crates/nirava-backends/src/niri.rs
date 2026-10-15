@@ -42,6 +42,8 @@ pub fn validate_layout(baseline:&[OutputState],draft:&[OutputState]) -> Result<(
         if !seen.insert(&output.connector) {bail!("Duplicate output in layout");}
         let original=baseline.iter().find(|o|o.connector==output.connector).ok_or_else(||anyhow::anyhow!("Output disappeared"))?;
         if output.identity!=original.identity{bail!("Output identity cannot be changed by a layout request");}
+        if output.modes!=original.modes||output.vrr_supported!=original.vrr_supported{bail!("Output capabilities changed; request a fresh inventory");}
+        if !(-65535..=65535).contains(&output.x)||!(-65535..=65535).contains(&output.y){bail!("Display position is outside the supported range");}
         if !output.enabled {continue;}
         if !output.scale.is_finite() || !(0.5..=4.0).contains(&output.scale) {bail!("Scale must be between 0.5 and 4");}
         if !original.modes.contains(&output.mode) {bail!("Mode was not advertised by {}",output.connector);}
@@ -79,6 +81,12 @@ mod tests {
     fn reject_disabling_every_monitor() {
         let baseline=nirava_core::Snapshot::demo().displays.outputs;
         let mut draft=baseline.clone();draft[0].enabled=false;
+        assert!(validate_layout(&baseline,&draft).is_err());
+    }
+    #[test]
+    fn reject_capability_changes_and_extreme_coordinates() {
+        let baseline=nirava_core::Snapshot::demo().displays.outputs;let mut draft=baseline.clone();draft[0].vrr_supported=!draft[0].vrr_supported;
+        assert!(validate_layout(&baseline,&draft).is_err());draft=baseline.clone();draft[0].x=i32::MAX;
         assert!(validate_layout(&baseline,&draft).is_err());
     }
     #[test]
