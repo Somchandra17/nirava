@@ -1,0 +1,16 @@
+name: build
+on: [push, pull_request]
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CI build dependencies
+        run: dnf install -y cargo rust gcc pkgconf-pkg-config gtk4-devel libadwaita-devel libpulse-devel python3 dbus-daemon
+      - name: Build all native components
+        run: cargo build --locked --workspace --features plain-cli/audio,plain-service/audio
+      - name: Test disposable fixtures
+        run: cargo test --locked --workspace --features plain-cli/audio,plain-service/audio
+      - name: Test isolated D-Bus
+        run: python3 tests/dbus_smoke.py

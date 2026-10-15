@@ -1,0 +1,16 @@
+[package]
+name = "plain-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+sha2 = "0.10"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+tempfile = "3"
+toml_edit = "0.25"
+kdl = { version = "6.7.1", features = ["v1"] }

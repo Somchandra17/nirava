@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Plain
+Comment=Settings for your Wayland desktop
+Exec=plain
+Icon=io.github.Somchandra17.Plain
+Terminal=false
+Categories=Settings;
+Keywords=display;sound;power;Wayland;Niri;Hyprland;
+StartupNotify=true
