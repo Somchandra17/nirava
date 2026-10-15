@@ -81,7 +81,7 @@ be large. Install those prerequisites only when you choose to do so. If Flathub
 is already configured, the explicit runtime/SDK preparation command is:
 
 ```sh
-flatpak install --user flathub org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
+flatpak install --user flathub org.gnome.Platform//51 org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
 ```
 
 No script adds a remote or installs a runtime automatically. Cargo source

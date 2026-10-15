@@ -27,7 +27,7 @@ jobs:
             sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           fi
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user --noninteractive -y flathub org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
+          flatpak install --user --noninteractive -y flathub org.gnome.Platform//51 org.gnome.Sdk//51 org.freedesktop.Sdk.Extension.rust-stable//26.08
       - name: Validate metadata and installer contracts
         run: |
           appstreamcli validate --no-net data/io.github.Somchandra17.Nirava.metainfo.xml
